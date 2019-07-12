@@ -48,33 +48,41 @@
       ; unwrap outer map
       (a/<!! ch)))
 
-(defn get-season-page [year season pagesize pagenum]
-  (let [q "Page(page: $pagenum perPage: $pagesize){
-             pageInfo{
-               hasNextPage
-             }
-             media(season: $season seasonYear: $year){
-               title{
-                 userPreferred
-               }
+(defn get-page [q vars pagesize pagenum]
+  (let [new-q (format
+                "Page(page: $pagenum perPage: $pagesize){
+                  pageInfo{
+                    hasNextPage
+                  }
+                  %s
+                }" q)
+        page-vars {:Int.pagesize pagesize
+                   :Int.pagenum pagenum}
+        new-vars (merge page-vars vars)]
+    (query new-q new-vars)))
+
+(defn get-all-pages
+  ([q vars] (get-all-pages q vars 1))
+  ([q vars page]
+   (let [this-page (get-page q (dissoc vars :page-type)
+                             50 page)
+         has-next  (((this-page "Page") "pageInfo") "hasNext")
+         results   ((this-page "Page") (vars :page-type))]
+     (if has-next
+       (concat results
+               (get-all-pages q vars 50 (inc page)))
+       results))))
+
+(defn get-season [year season]
+  (let [q "media(season: $season seasonYear: $year){
+             title{
+               userPreferred
              }
            }"
-        vars {:Int.year year
-              :MediaSeason.season season
-              :Int.pagesize pagesize
-              :Int.pagenum pagenum}]
-    (query q vars)))
-
-(defn get-season
-  ([year season] (get-season year season 1))
-  ([year season page]
-   (let [this-page (get-season-page year season 50 page)
-         has-next (((this-page "Page") "pageInfo") "hasNext")
-         shows ((this-page "Page") "media")]
-     (if has-next
-       (concat shows
-               (get-season-page year season 50 (inc page)))
-       shows))))
+        vars {:page-type "media"
+              :Int.year year
+              :MediaSeason.season season}]
+    (get-all-pages q vars)))
 (def a (get-season 2019 :SPRING))
 
 (defn -main
