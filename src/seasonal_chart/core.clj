@@ -74,16 +74,44 @@
        results))))
 
 (defn get-season [year season]
-  (let [q "media(season: $season seasonYear: $year){
-             title{
-               userPreferred
-             }
-           }"
+  (let [q "media(season: $season seasonYear: $year
+                 type: ANIME){
+            id
+            idMal
+            title{
+              romaji
+              english
+            }
+            format
+            staff {
+              edges {
+                role
+                node{
+                  id
+                  name {
+                    first
+                    last
+                    native
+                  }
+                }
+              }
+            }
+          }"
         vars {:page-type "media"
               :Int.year year
               :MediaSeason.season season}]
     (get-all-pages q vars)))
-(def a (get-season 2019 :SPRING))
+
+(defn save-season [year season]
+  (spit (str "data/" year "_" (name season) "_season.edn")
+        (with-out-str (pr (get-season year season)))))
+
+(defn load-season [year season]
+  (read-string (slurp
+                 (str "data/" year "_" (name season)
+                      "_season.edn"))))
+
+(def a (load-season 2019 :SUMMER))
 
 (defn -main
   "I don't do a whole lot ... yet."
