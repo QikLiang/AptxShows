@@ -66,7 +66,9 @@
   ([q vars page]
    (let [this-page (get-page q (dissoc vars :page-type)
                              50 page)
-         has-next  (((this-page "Page") "pageInfo") "hasNext")
+         has-next  (get-in this-page ["Page"
+                                      "pageInfo"
+                                      "hasNext"])
          results   ((this-page "Page") (vars :page-type))]
      (if has-next
        (concat results
@@ -102,17 +104,61 @@
               :MediaSeason.season season}]
     (get-all-pages q vars)))
 
-(defn save-season [year season]
-  (spit (str "data/" year "_" (name season) "_season.edn")
-        (with-out-str (pr (get-season year season)))))
+(defn get-user-completed-list [user]
+ (let [q "MediaListCollection(userName: $user
+                              type: ANIME
+                              status: COMPLETED){
+           lists {
+             entries {
+               score
+               media {
+                 title{english}
+                 id
+                 staff {
+                   edges {
+                     role
+                     node { id }
+                   }
+                 }
+               }
+             }
+           }
+         }"
+       vars {:String.user user}]
+   (-> (query q vars)
+       (get-in ["MediaListCollection" "lists"])
+       (first)
+       (get "entries"))))
 
+(defn save-obj [obj file-name]
+  (spit file-name (with-out-str (pr obj))))
+(defn load-obj [file-name]
+  (read-string (slurp file-name)))
+
+(defn save-season [year season]
+  (save-obj
+    (get-season year season)
+    (str "data/" year "_" (name season) "_season.edn")))
 (defn load-season [year season]
-  (read-string (slurp
-                 (str "data/" year "_" (name season)
-                      "_season.edn"))))
+  (load-obj
+    (str "data/" year "_" (name season) "_season.edn")))
+
+(defn save-user-completed-list [user]
+  (save-obj
+    (get-user-completed-list user)
+    (str "data/" user ".edn")))
+(defn load-user-completed-list [user]
+  (load-obj
+    (str "data/" user ".edn")))
 
 (def a (load-season 2019 :SUMMER))
+(def b (load-user-completed-list "my_completed"))
 
+(-> b
+(get-in ["MediaListcollection"
+         "lists"])
+(first)
+(get "entries"))
 (defn -main
   "I don't do a whole lot ... yet."
   [& args]
