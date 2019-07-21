@@ -84,6 +84,7 @@
               romaji
               english
             }
+            coverImage { medium }
             format
             staff {
               edges {
@@ -104,7 +105,7 @@
               :MediaSeason.season season}]
     (get-all-pages q vars)))
 
-(defn get-user-completed-list [user]
+(defn get-user-data [user]
  (let [q "MediaListCollection(userName: $user
                               type: ANIME
                               status: COMPLETED){
@@ -112,7 +113,7 @@
              entries {
                score
                media {
-                 title{english}
+                 title{english romaji}
                  id
                  staff {
                    edges {
@@ -123,12 +124,32 @@
                }
              }
            }
+         },
+         User(name: $user){
+           favourites {
+             staff {
+               nodes { id }
+             }
+             studios {
+               nodes { id }
+             }
+           }
+           stats {
+             animeListScores {
+               meanScore
+               standardDeviation
+             }
+           }
          }"
-       vars {:String.user user}]
-   (-> (query q vars)
-       (get-in ["MediaListCollection" "lists"])
-       (first)
-       (get "entries"))))
+       vars {:String.user user}
+       results (query q vars)]
+   {:shows (-> results
+               (get-in ["MediaListCollection" "lists"])
+               (first)
+               (get "entries"))
+    :favorites (get-in results ["User" "favourites"])
+    :stats (get-in results ["User" "stats"
+                            "animeListScores"])}))
 
 (defn save-obj [obj file-name]
   (spit file-name (with-out-str (pr obj))))
@@ -143,22 +164,34 @@
   (load-obj
     (str "data/" year "_" (name season) "_season.edn")))
 
-(defn save-user-completed-list [user]
+(defn save-user-data [user]
   (save-obj
-    (get-user-completed-list user)
+    (get-user-data user)
     (str "data/" user ".edn")))
-(defn load-user-completed-list [user]
+(defn load-user-data [user]
   (load-obj
     (str "data/" user ".edn")))
 
 (def a (load-season 2019 :SUMMER))
-(def b (load-user-completed-list "my_completed"))
+(def b (load-user-data "my_data"))
 
-(-> b
-(get-in ["MediaListcollection"
-         "lists"])
-(first)
-(get "entries"))
+(defn get-stddev [stats]
+  (fn [score] (/ (- score (stats "meanScore"))
+                 (stats "standardDeviation"))))
+
+(defn show-to-staff [show]
+  (let [show-info {:title   (get-in show ["media" "title"])
+                   :show-id (get-in show ["media" "id"])
+                   :score   (get show "score")}]
+    (into {} (for [staff (get-in show ["media"
+                                       "staff"
+                                       "edges"])]
+               [(get-in staff ["node" "id"])
+                [(assoc show-info :role (staff "role"))]]))))
+
+(defn shows-to-staff [shows]
+  (apply merge-with into (map show-to-staff shows)))
+
 (defn -main
   "I don't do a whole lot ... yet."
   [& args]
