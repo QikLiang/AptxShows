@@ -1,4 +1,4 @@
-(ns seasonal-chart.core
+(ns seasonal-chart.anilist-api
   (:require [ajax.core :refer [POST]]
             [clojure.data.json :as json]
             [clojure.core.async :as a]
@@ -256,9 +256,3 @@
                   (compile-list works)
                   format-season-show)
                 season)))
-(def b (first (take-last 3 results)))
-
-(defn -main
-  "I don't do a whole lot ... yet."
-  [& args]
-  (println "Hello, World!"))

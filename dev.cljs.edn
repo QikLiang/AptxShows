@@ -1,0 +1,4 @@
+^{:ring-handler seasonal-chart.handler/app
+  :css-dirs ["resources/public/css"]}
+{:main seasonal-chart.homepage
+ :output-to "target/public/cljs-out/homepage.js"}
