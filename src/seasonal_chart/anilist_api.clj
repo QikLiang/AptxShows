@@ -87,7 +87,10 @@
               romaji
               english
             }
-            coverImage { medium }
+            coverImage {
+              medium
+              large
+            }
             format
             staff {
               edges {
@@ -99,6 +102,7 @@
                     last
                     native
                   }
+                  image { medium }
                 }
               }
             }
@@ -120,6 +124,7 @@
                media {
                  title{english romaji}
                  id
+                 coverImage { medium }
                  staff {
                    edges {
                      role
@@ -167,21 +172,41 @@
   (let [update-score #(update % "score" (get-stddev data))]
     (update data :shows #(map update-score %))))
 
+(defn update-map
+  "update every value in map m with function f"
+  [m f]
+  (reduce-kv (fn [m k v]
+    (assoc m k (f v))) {} m))
+
 (defn show-to-staff [show]
   (let [show-info {:title   (get-in show ["media" "title"])
                    :show-id (get-in show ["media" "id"])
-                   :score   (get show "score")}]
-    (into {} (for [staff (get-in show ["media"
-                                       "staff"
-                                       "edges"])]
-               [(get-in staff ["node" "id"])
-                [(assoc show-info :role (staff "role"))]]))))
+                   :score   (get show "score")
+                   :image   (get-in show ["media"
+                                          "coverImage"
+                                          "medium"])}
+        format-roles (fn [roles]
+                       (assoc show-info :roles
+                              (map #(% "role") roles)))]
+    (update-map
+      (group-by #(get-in % ["node" "id"])
+                (get-in show ["media" "staff" "edges"]))
+      format-roles)))
+
+(defn merge-into-list [maps]
+  (reduce (fn [m [k v]]
+            ; conj v onto (m k), and supply []
+            ; if (m k) doesn't already exist
+            (assoc m k (conj (get m k []) v)))
+          {}
+          ; convert [{:keys vals}] into [[:key val]...]
+          (apply concat maps)))
 
 (defn shows-to-staff
   "Convert query result's show-to-staff mapping to
   a staff-to-show mapping."
   [shows]
-  (apply merge-with into (map show-to-staff shows)))
+  (merge-into-list (map show-to-staff shows)))
 
 (defn user-preferences [user]
   (-> user
@@ -190,22 +215,33 @@
 
 (defn format-season-show
   [show]
-  (assoc show "staff"
-         (into {} (for [staff (get-in show ["staff"
-                                            "edges"])]
-                    [(get-in staff ["node" "id"])
-                     {:new-show-role (staff "role")
-                      :staff-name (get-in staff ["node" "name"])}]))))
+  (assoc show
+         "staff"
+         (update-map
+           (group-by #(get-in % ["node" "id"])
+                     (get-in show ["staff" "edges"]))
+           (fn [staffs]
+             {:roles (map #(% "role") staffs)
+              :staff-name (get-in (first staffs) ["node"
+                                                  "name"])
+              :staff-img (get-in (first staffs) ["node"
+                                                 "image"
+                                                 "medium"])}))))
+         ;(into {} (for [staff (get-in show ["staff"
+                                            ;"edges"])]
+                    ;[(get-in staff ["node" "id"])
+                     ;{:role (staff "role")
+                      ;:staff-name (get-in staff ["node" "name"])
+                      ;:staff-img (get-in staff ["node" "image" "medium"])}]))))
 
 (defn compile-staff [show staff-works]
   (for [[id info] (show "staff")
-        :let [works (staff-works id)
-              weight (reduce + (map :score works))]
-        :when (not (nil? works))]
+        :let [works (staff-works id)]
+        :when (some? works)]
     (assoc info
            :type :staff
            :works works
-           :weight weight)))
+           :weight (reduce + (map :score works)))))
 
 (defn compile-list [staff-works]
   (fn [show]
@@ -246,13 +282,13 @@
   (load-obj
     (str "data/" user ".edn")))
 
-(def season (load-season 2019 :SUMMER))
-(def data (load-user-data "my_data"))
-(def works (shows-to-staff (:shows data)))
-(def results
-  (sort-by :weight #(compare %2 %1)
-           (map (comp
-                  (weigh-show data)
-                  (compile-list works)
-                  format-season-show)
-                season)))
+(defn load-results []
+  (let [season (load-season 2019 :SUMMER)
+        data (load-user-data "my_data")
+        works (shows-to-staff (:shows data))]
+    (sort-by :weight #(compare %2 %1)
+             (map (comp
+                    (weigh-show data)
+                    (compile-list works)
+                    format-season-show)
+                  season))))

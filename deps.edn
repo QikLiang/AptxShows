@@ -2,6 +2,7 @@
         org.clojure/clojurescript {:mvn/version "1.10.339"}
         cljs-ajax {:mvn/version "0.7.5"}
         org.clojure/core.async {:mvn/version "0.4.500"}
+        http-kit {:mvn/version "2.3.0"}
         compojure {:mvn/version "1.6.1"}
         ring/ring-defaults {:mvn/version "0.3.2"}
         hiccup {:mvn/version "1.0.5"}
@@ -9,5 +10,6 @@
         com.bhauman/figwheel-main {:mvn/version "0.2.3"}
         com.bhauman/rebel-readline-cljs {:mvn/version "0.1.4"}}
  :paths ["src" "resources" "target"]
- :aliases {:fig {:main-opts ["-m" "figwheel.main" "-b" "dev" "-r"]}}
+ :aliases {:fig {:main-opts ["-m" "figwheel.main" "-b" "dev" "-r"]}
+           :ring {:main-opts ["-m" "seasonal-chart.handler" "-r"]}}
  }

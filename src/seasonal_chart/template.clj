@@ -8,5 +8,6 @@
      (include-css "css/style.css")]
     [:body
      [:div#center-strip
+      [:div#header]
       [:div#app]]
      (include-js "cljs-out/homepage.js")]))

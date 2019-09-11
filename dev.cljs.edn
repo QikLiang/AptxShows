@@ -1,4 +1,5 @@
-^{:ring-handler seasonal-chart.handler/app
-  :css-dirs ["resources/public/css"]}
+^{:css-dirs ["resources/public/css"]
+  :open-url "http://localhost:3000"
+  }
 {:main seasonal-chart.homepage
  :output-to "target/public/cljs-out/homepage.js"}
