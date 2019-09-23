@@ -2,14 +2,91 @@
   (:require [reagent.core :as r]
             [ajax.core :refer [GET]]
             [cljs.reader :as reader]
-            [clojure.string :as str]))
-
-(js/console.log "testing")
+            [clojure.string :as str]
+            [seasonal-chart.rank-shows :as rank]))
 
 (def shows (r/atom []))
 
+(def settings-ui (r/atom {:preference
+                          {:story 1, :sound 1, :art 1, :cg 1,
+                           :music 1, :direction 1, :design 1,
+                           :animation 1, :production 1}
+                          :auto-update true}))
+
+(def settings (r/atom @settings-ui))
+
+(def cur-season (atom {:year 2019 :season "summer"}))
+
+(defn update-shows! []
+  (js/console.log (str (:preference @settings)))
+  (reset! settings @settings-ui))
+
+(defn auto-update! []
+  (when (:auto-update @settings-ui) (update-shows!)))
+
+(defn r-map
+  "a version of map that puts functions in a form that
+   reagent can call afterwards"
+  ([f vs] (r-map identity f vs))
+  ([keyf f vs]
+   (map (fn [& v] (into ^{:key (keyf v)}[f] v)) vs)))
+
+(defn show-season-button [{:keys [year season] :as entry}]
+  [:button.button.season-button
+   {:on-click (fn [e] (reset! cur-season entry))}
+   (str(str/upper-case season) " " year)])
+
+(defn setting-slider [[desc param]]
+  [:div.setting-slider
+   [:div.slider-desc desc]
+   (let [slider-range 100]
+     [:input {:type "range" :min 0 :max slider-range
+              :value (* slider-range
+                        (get-in @settings-ui [:preference param]))
+              :on-change (fn [e]
+                           (swap! settings-ui assoc-in
+                                  [:preference param]
+                                  (/ (.. e -target -value)
+                                     slider-range)))
+              :on-mouse-up auto-update!
+              :on-touch-end auto-update!}])])
+
+(defn show-header []
+  [:div#header-content
+   [:div#seasons-list
+    (r-map show-season-button [{:year 2019 :season "summer"}
+                               {:year 2019 :season "fall"}])]
+   [:hr]
+   [:div#user-entries
+    [:div#anilist-entry.user-entry
+     "Anilist unsername: "
+     [:input {:type "text"}]
+     [:button "Fetch my completed list"]]]
+   [:hr]
+   [:div#settings-sliders
+    (r-map setting-slider
+           [["Directing"     :direction]
+            ["Animation"     :animation]
+            ["Story"         :story]
+            ["Art"           :art]
+            ["Music"         :music]
+            ["Visual Design" :design]
+            ["Sound"         :sound]
+            ["CG"            :cg]
+            ["Production"    :production]])]
+   [:hr]
+   [:div#update-button-div
+    [:button#update-button.button {:on-click update-shows!}
+     "Apply Preferences"]
+    [:input#auto-update
+     {:type "checkbox"
+      :checked (:auto-update @settings-ui)
+      :on-change (fn [e]
+                   (swap! settings-ui update :auto-update
+                          not))}]
+    [:div "Auto-update (uncheck if laggy)"]]])
+
 (defn reset-state [showlist]
-  (js/console.log showlist)
   (reset! shows (reader/read-string showlist)))
 
 (GET "/api/user" {:handler reset-state})
@@ -38,52 +115,57 @@
 
 (defn display-entity
   "Create a display with an image, name, and description"
-  [ent-img ent-name ent-desc]
+  [ent-img ent-name ent-desc attrs]
   ; {} for parent functions to add attributes
-  [:div.entity-group {}
+  [:div.entity-group (merge {:key ent-name} attrs)
    [:img {:src ent-img}]
    [:div.entity-name ent-name]
-   [:div.entity-desc (if (seq? ent-desc)
-                       (for [desc ent-desc]
-                         [:div desc])
-                       ent-desc)]])
+   (into [:div.entity-desc] (if (sequential? ent-desc)
+                              (map (partial into [:p])
+                                   ent-desc)
+                              [ent-desc]))])
 
 (defn display-show-entity [show]
-  (assoc (display-entity (show :image)
-                         (abreviate-title
-                           (get-in show [:title "romaji"]))
-                         (show :roles))
-         1 {:class "show-entity"}))
+  (display-entity (show :image)
+                  (abreviate-title
+                    (get-in show [:title "romaji"]))
+                  (show :roles)
+                  {:class "show-entity"}))
 
 (defn display-staff-entity [staff]
-  (assoc
-    (display-entity (staff :staff-img)
-                    (print-name (staff :staff-name))
-                    (for [role (staff :roles)]
-                      [:div role]))
-    1 {:class "staff-entity"}))
+  (display-entity (staff :staff-img)
+                  (print-name (staff :staff-name))
+                  (staff :roles)
+                  {:class "staff-entity"}))
 
 (defn display-staff-works [staff]
-    [:div.list-item.staff-works
-     (display-staff-entity staff)
-     (map display-show-entity
-          (take 4 (sort-by :score (comp - compare)
-                           (staff :works))))])
+  [:div.list-item.staff-works
+   (display-staff-entity staff)
+   (map display-show-entity
+        (take 4 (sort-by :score (comp - compare)
+                         (staff :works))))])
 
 (defn display-show [show]
-  [:div.show-item
+  [:div.show-item {:key (show "id")}
    [:div.cover-wrapper
     [:img.show-img {:src
                     (get-in show ["coverImage" "large"])}]
     [:div.show-info
      [:div.show-title (get-in show ["title" "romaji"])]
      (into [:div.show-info-list]
-           (map display-staff-works
-                (take 4 (sort-by :weight (comp - compare)
-                                 (show :list)))))]]])
+           (r-map :staff-name display-staff-works
+                  (take 4 (sort-by :weight (comp - compare)
+                                   (show :list)))))]]])
 
 (defn show-list []
   (if (empty? @shows) [:div "empty"]
-    (into [:div.show-list] (map display-show @shows))))
+    (into [:div.show-list]
+          (r-map #(get % "id") display-show
+                 (map (partial rank/apply-preference
+                               (:preference @settings))
+                      @shows)))))
+
+(r/render [show-header]
+          (.getElementById js/document "header"))
 
 (r/render [show-list] (.getElementById js/document "app"))

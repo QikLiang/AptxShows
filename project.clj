@@ -5,13 +5,14 @@
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :resource-paths ["target" "resources"]
   :dependencies [[org.clojure/clojure "1.10.0"]
+                 [org.clojure/clojurescript "1.10.312"]
                  [cljs-ajax "0.7.5"]
                  [org.clojure/core.async "0.4.500"]
+                 [http-kit "2.3.0"]
                  [compojure "1.6.1"]
                  [ring/ring-defaults "0.3.2"]
-                 [org.clojure/clojurescript "1.10.312"]
-                 [http-kit "2.3.0"]
-                 [hiccup "1.0.5"]]
+                 [hiccup "1.0.5"]
+                 [reagent "0.8.1"]]
   :main seasonal-chart.handler
   :plugins [[lein-ring "0.12.5"]]
   :ring {:handler seasonal-chart.handler/app}

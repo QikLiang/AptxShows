@@ -227,12 +227,6 @@
               :staff-img (get-in (first staffs) ["node"
                                                  "image"
                                                  "medium"])}))))
-         ;(into {} (for [staff (get-in show ["staff"
-                                            ;"edges"])]
-                    ;[(get-in staff ["node" "id"])
-                     ;{:role (staff "role")
-                      ;:staff-name (get-in staff ["node" "name"])
-                      ;:staff-img (get-in staff ["node" "image" "medium"])}]))))
 
 (defn compile-staff [show staff-works]
   (for [[id info] (show "staff")
