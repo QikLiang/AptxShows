@@ -9,5 +9,7 @@
     [:body
      [:div#center-strip
       [:div#header]
-      [:div#app]]
+      [:div#app
+       [:h1.show-item.load-message
+        "Please wait while loading"]]]
      (include-js "cljs-out/homepage.js")]))

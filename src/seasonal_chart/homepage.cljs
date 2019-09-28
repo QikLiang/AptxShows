@@ -24,6 +24,20 @@
 (defn auto-update! []
   (when (:auto-update @settings-ui) (update-shows!)))
 
+(defn reset-state [showlist]
+  (reset! shows (reader/read-string showlist)))
+
+(defn get-shows! []
+  (let [{year :year season :season} @cur-season
+        user (some-> js/document
+                 (.getElementById "anilist-input")
+                 (.-value)
+                 (js/encodeURIComponent))
+        url (str/join "/" ["/api/getshows"
+                           (str year) season user])]
+  (GET url {:handler reset-state})))
+;(GET "/api/user" {:handler reset-state})
+
 (defn r-map
   "a version of map that puts functions in a form that
    reagent can call afterwards"
@@ -33,7 +47,9 @@
 
 (defn show-season-button [{:keys [year season] :as entry}]
   [:button.button.season-button
-   {:on-click (fn [e] (reset! cur-season entry))}
+   {:on-click (fn [e] (do
+                        (reset! cur-season entry)
+                        (get-shows!)))}
    (str(str/upper-case season) " " year)])
 
 (defn setting-slider [[desc param]]
@@ -60,7 +76,7 @@
    [:div#user-entries
     [:div#anilist-entry.user-entry
      "Anilist unsername: "
-     [:input {:type "text"}]
+     [:input#anilist-input {:type "text"}]
      [:button "Fetch my completed list"]]]
    [:hr]
    [:div#settings-sliders
@@ -85,11 +101,6 @@
                    (swap! settings-ui update :auto-update
                           not))}]
     [:div "Auto-update (uncheck if laggy)"]]])
-
-(defn reset-state [showlist]
-  (reset! shows (reader/read-string showlist)))
-
-(GET "/api/user" {:handler reset-state})
 
 (defn abreviate-title
   "insert ellipses smartly in long show titles"
@@ -117,7 +128,7 @@
   "Create a display with an image, name, and description"
   [ent-img ent-name ent-desc attrs]
   ; {} for parent functions to add attributes
-  [:div.entity-group (merge {:key ent-name} attrs)
+  [:a.entity-group (merge {:key ent-name} attrs)
    [:img {:src ent-img}]
    [:div.entity-name ent-name]
    (into [:div.entity-desc] (if (sequential? ent-desc)
@@ -130,13 +141,17 @@
                   (abreviate-title
                     (get-in show [:title "romaji"]))
                   (show :roles)
-                  {:class "show-entity"}))
+                  {:class "show-entity"
+                   :href (str "https://anilist.co/anime/"
+                              (show :show-id))}))
 
 (defn display-staff-entity [staff]
   (display-entity (staff :staff-img)
                   (print-name (staff :staff-name))
                   (staff :roles)
-                  {:class "staff-entity"}))
+                  {:class "staff-entity"
+                   :href (str "https://anilist.co/staff/"
+                              (staff :staff-id))}))
 
 (defn display-staff-works [staff]
   [:div.list-item.staff-works
@@ -147,25 +162,33 @@
 
 (defn display-show [show]
   [:div.show-item {:key (show "id")}
-   [:div.cover-wrapper
+   [:div.info-column
     [:img.show-img {:src
                     (get-in show ["coverImage" "large"])}]
+    [:a {:href (str "https://anilist.co/anime/" (show "id"))}
+     "Anilist entry"]
+    [:a {:href (str "https://myanimelist.net/anime/"
+                    (show "idMal"))}
+     "MyAnimeList entry"]]
     [:div.show-info
      [:div.show-title (get-in show ["title" "romaji"])]
      (into [:div.show-info-list]
            (r-map :staff-name display-staff-works
                   (take 4 (sort-by :weight (comp - compare)
-                                   (show :list)))))]]])
+                                   (show :list)))))]])
 
 (defn show-list []
-  (if (empty? @shows) [:div "empty"]
+  (if (empty? @shows) [:h1.show-item.load-message
+                       "Please wait while loading"]
     (into [:div.show-list]
-          (r-map #(get % "id") display-show
-                 (map (partial rank/apply-preference
-                               (:preference @settings))
-                      @shows)))))
+          (->> @shows
+               (map (partial rank/apply-preference
+                             (:preference @settings)))
+               (sort-by :weight (comp - compare))
+               (r-map #(get % "id") display-show)))))
 
 (r/render [show-header]
           (.getElementById js/document "header"))
 
 (r/render [show-list] (.getElementById js/document "app"))
+(get-shows!)

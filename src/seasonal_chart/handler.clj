@@ -11,7 +11,16 @@
 
 (defroutes app-routes
   (GET "/" a (home-page))
-  (GET "/api/user" [] (pr-str (anilist/load-results)))
+  (GET "/api/getshows/:year/:season/"
+       [year season] (pr-str (do
+                               (println [year season])
+                               (anilist/load-results
+                                 year season))))
+  (GET "/api/getshows/:year/:season/:user"
+       [year season user] (pr-str (do
+                                    (println [year season
+                                              user])
+                                    (anilist/load-results))))
   (route/resources "/" )
   (route/not-found "Not Found"))
 

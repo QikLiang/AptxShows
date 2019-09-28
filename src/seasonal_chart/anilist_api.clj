@@ -235,6 +235,7 @@
     (assoc info
            :type :staff
            :works works
+           :staff-id id
            :weight (reduce + (map :score works)))))
 
 (defn compile-list [staff-works]
@@ -263,10 +264,12 @@
 (defn save-season [year season]
   (save-obj
     (get-season year season)
-    (str "data/" year "_" (name season) "_season.edn")))
+    (str "data/" year "_"
+         (str/lower-case (name season)) "_season.edn")))
 (defn load-season [year season]
   (load-obj
-    (str "data/" year "_" (name season) "_season.edn")))
+    (str "data/" year "_"
+         (str/lower-case (name season)) "_season.edn")))
 
 (defn save-user-data [user]
   (save-obj
@@ -276,8 +279,8 @@
   (load-obj
     (str "data/" user ".edn")))
 
-(defn load-results []
-  (let [season (load-season 2019 :SUMMER)
+(defn load-results [year season]
+  (let [shows (load-season year season)
         data (load-user-data "my_data")
         works (shows-to-staff (:shows data))]
     (sort-by :weight #(compare %2 %1)
@@ -285,4 +288,4 @@
                     (weigh-show data)
                     (compile-list works)
                     format-season-show)
-                  season))))
+                  shows))))
