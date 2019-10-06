@@ -20,7 +20,8 @@
        [year season user] (pr-str (do
                                     (println [year season
                                               user])
-                                    (anilist/load-results))))
+                                    (anilist/load-results
+                                      year season user))))
   (route/resources "/" )
   (route/not-found "Not Found"))
 

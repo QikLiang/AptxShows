@@ -5,6 +5,12 @@
             [clojure.string :as str])
   (:gen-class))
 
+(defn update-map
+  "update every value in map m with function f"
+  [m f]
+  (reduce-kv (fn [m k v]
+    (assoc m k (f v))) {} m))
+
 (defn parsevar
   "Format parameter variables for GraphQL query.
   Expects input in the form {:Type.name value, ...}
@@ -34,7 +40,7 @@
         handler (fn [result] (a/>!! ch (result "data")))
         error-handler (fn [er]
                         (println er)
-                        (a/>!! ch :error))]
+                        (a/>!! ch {:error er}))]
       (POST url {:params {:query wrappedq,
                           :variables varmap},
                  :handler handler
@@ -76,6 +82,21 @@
                (get-all-pages q vars 50 (inc page)))
        results))))
 
+(defn format-season-show
+  [show]
+  (assoc show
+         "staff"
+         (update-map
+           (group-by #(get-in % ["node" "id"])
+                     (get-in show ["staff" "edges"]))
+           (fn [staffs]
+             {:roles (map #(% "role") staffs)
+              :staff-name (get-in (first staffs) ["node"
+                                                  "name"])
+              :staff-img (get-in (first staffs) ["node"
+                                                 "image"
+                                                 "medium"])}))))
+
 (defn get-season
   "Return all airing shows for a season."
   [year season]
@@ -110,7 +131,49 @@
         vars {:page-type "media"
               :Int.year year
               :MediaSeason.season season}]
-    (get-all-pages q vars)))
+    (map format-season-show (get-all-pages q vars))))
+
+(defn get-popular
+  "return the top most popular shows"
+  []
+  (let [q "media(sort: POPULARITY_DESC
+                 status_in: [RELEASING FINISHED]){
+            id
+            title{
+              romaji
+              english
+            }
+            averageScore
+            coverImage { medium }
+            staff {
+              edges {
+                role
+                node{ id }
+              }
+            }
+          }"
+        results (->> (range 1 21)
+                     (map (partial get-page q {} 50))
+                     (mapcat #(get-in % ["Page" "media"])))
+        scores (map #(get % "averageScore") results)
+        mean (/ (reduce + scores) (count scores))
+        deviation (Math/sqrt
+                    (/ (reduce +
+                               (map (comp
+                                      #(* % %)
+                                      #(- % mean)) scores))
+                       (dec (count scores))))]
+    (map (fn [show]
+           (assoc show :score
+                  (/ (- (show "averageScore") mean)
+                     deviation)))
+         results)))
+
+(defn stddev-score
+  "compute a score's standard deviation."
+  [stats score]
+  (/ (- score (stats "meanScore"))
+     (stats "standardDeviation")))
 
 (defn get-user-data
   "Fetch all user data needed to personalize results."
@@ -152,45 +215,35 @@
            }
          }"
        vars {:String.user user}
-       results (query q vars)]
-   {:shows (-> results
-               (get-in ["MediaListCollection" "lists"])
-               (first)
-               (get "entries"))
-    :favorites (get-in results ["User" "favourites"])
-    :stats (get-in results ["User" "stats"
-                            "animeListScores"])}))
-
-(defn get-stddev
-  "Return function to compute a score's standard deviation."
-  [user-data]
-  (let [stats (user-data :stats)]
-    (fn [score] (/ (- score (stats "meanScore"))
-                   (stats "standardDeviation")))))
-
-(defn process-user-data [data]
-  (let [update-score #(update % "score" (get-stddev data))]
-    (update data :shows #(map update-score %))))
-
-(defn update-map
-  "update every value in map m with function f"
-  [m f]
-  (reduce-kv (fn [m k v]
-    (assoc m k (f v))) {} m))
+       results (query q vars)
+       shows (-> results
+                 (get-in ["MediaListCollection" "lists"])
+                 (first)
+                 (get "entries"))
+       stats (get-in results ["User" "stats"
+                            "animeListScores"])
+       attach-score
+       (fn [show]
+         (assoc (show "media")
+                :score
+                (stddev-score stats (show "score"))))]
+   (get results :error ; pass up error if exist
+        {:shows (map attach-score shows)
+         :favorites (get-in results ["User" "favourites"])
+         :stats stats})))
 
 (defn show-to-staff [show]
-  (let [show-info {:title   (get-in show ["media" "title"])
-                   :show-id (get-in show ["media" "id"])
-                   :score   (get show "score")
-                   :image   (get-in show ["media"
-                                          "coverImage"
+  (let [show-info {:title   (show "title")
+                   :show-id (show "id")
+                   :score   (show :score)
+                   :image   (get-in show ["coverImage"
                                           "medium"])}
         format-roles (fn [roles]
                        (assoc show-info :roles
                               (map #(% "role") roles)))]
     (update-map
       (group-by #(get-in % ["node" "id"])
-                (get-in show ["media" "staff" "edges"]))
+                (get-in show ["staff" "edges"]))
       format-roles)))
 
 (defn merge-into-list [maps]
@@ -207,26 +260,6 @@
   a staff-to-show mapping."
   [shows]
   (merge-into-list (map show-to-staff shows)))
-
-(defn user-preferences [user]
-  (-> user
-      (get-user-data)
-      (process-user-data)))
-
-(defn format-season-show
-  [show]
-  (assoc show
-         "staff"
-         (update-map
-           (group-by #(get-in % ["node" "id"])
-                     (get-in show ["staff" "edges"]))
-           (fn [staffs]
-             {:roles (map #(% "role") staffs)
-              :staff-name (get-in (first staffs) ["node"
-                                                  "name"])
-              :staff-img (get-in (first staffs) ["node"
-                                                 "image"
-                                                 "medium"])}))))
 
 (defn compile-staff [show staff-works]
   (for [[id info] (show "staff")
@@ -248,13 +281,6 @@
     0.
     (/ (reduce + nums) (count nums))))
 
-(defn weigh-show [user-data]
-  (fn [show]
-    (let [types (group-by :type (show :list))
-          staff-work-scores (map :weight (types :staff))]
-      (assoc show :weight
-             (reduce + staff-work-scores)))))
-
 ; For debug
 (defn save-obj [obj file-name]
   (spit file-name (with-out-str (pr obj))))
@@ -273,19 +299,30 @@
 
 (defn save-user-data [user]
   (save-obj
-    (user-preferences user)
+    (get-user-data user)
     (str "data/" user ".edn")))
 (defn load-user-data [user]
   (load-obj
     (str "data/" user ".edn")))
 
-(defn load-results [year season]
-  (let [shows (load-season year season)
-        data (load-user-data "my_data")
-        works (shows-to-staff (:shows data))]
-    (sort-by :weight #(compare %2 %1)
-             (map (comp
-                    (weigh-show data)
-                    (compile-list works)
-                    format-season-show)
-                  shows))))
+(defn link-season-to-shows [new-season shows-seen]
+  (let [staff-works (shows-to-staff shows-seen)]
+    (map (compile-list staff-works) new-season)))
+
+(defn load-results
+  ([year season] (link-season-to-shows
+                   (load-season year season)
+                   (load-obj "data/most_popular.edn")))
+  ([year season user] (link-season-to-shows
+                        (load-season year season)
+                        (:shows (get-user-data user)))))
+(comment
+  ([year season user]
+   (let [user-data (get-user-data user)]
+     (if (= "User not found"
+            (get-in user-data [:response "errors"
+                               0 "message"]))
+       :user-not-found
+       (link-season-to-shows
+         (load-season year season)
+         (:shows (get-user-data user)))))))

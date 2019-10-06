@@ -48,7 +48,6 @@ button {
 	background-color: var(--highlight-background);
 	color: var(--highlight-color);
 	border-radius: 10px;
-	margin-right: 30px;
 	font-size: 1.2em;
 	cursor: pointer;
 }
@@ -117,9 +116,10 @@ button:active {
 	font-size: 1.2em;
 }
 
-#auto-update {
+input[type="checkbox"] {
 	zoom: 2.5;
 	margin: 0;
+	margin-left: 10px;
 }
 
 .show-item {

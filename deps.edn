@@ -7,6 +7,7 @@
         ring/ring-defaults {:mvn/version "0.3.2"}
         hiccup {:mvn/version "1.0.5"}
         reagent {:mvn/version "0.8.1"}
+        reagent-utils {:mvn/version "0.3.3"}
         com.bhauman/figwheel-main {:mvn/version "0.2.3"}
         com.bhauman/rebel-readline-cljs {:mvn/version "0.1.4"}}
  :paths ["src" "resources" "target"]
