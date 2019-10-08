@@ -34,12 +34,15 @@
 
 (defonce server (atom nil))
 
+(def port (Integer/valueOf
+            (or (System/getenv "port")
+                "3000")))
+
 (defn start []
   (reset! server
-          (run-server #'app {:port (Integer/valueOf
-                                     (or (System/getenv "port")
-                                         "3000"))
-                             :join false})))
+          (run-server #'app {:port port})))
 
 (defn -main [& args]
-  (start))
+  (println (str "starting server on port " port))
+  (start)
+  (println "started"))
