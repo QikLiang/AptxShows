@@ -2,8 +2,7 @@
   (:require [ajax.core :refer [POST]]
             [clojure.data.json :as json]
             [clojure.core.async :as a]
-            [clojure.string :as str])
-  (:gen-class))
+            [clojure.string :as str]))
 
 (defn update-map
   "update every value in map m with function f"
@@ -75,11 +74,11 @@
                              50 page)
          has-next  (get-in this-page ["Page"
                                       "pageInfo"
-                                      "hasNext"])
+                                      "hasNextPage"])
          results   ((this-page "Page") (vars :page-type))]
      (if has-next
        (concat results
-               (get-all-pages q vars 50 (inc page)))
+               (get-all-pages q vars (inc page)))
        results))))
 
 (defn format-season-show
@@ -316,13 +315,3 @@
   ([year season user] (link-season-to-shows
                         (load-season year season)
                         (:shows (get-user-data user)))))
-(comment
-  ([year season user]
-   (let [user-data (get-user-data user)]
-     (if (= "User not found"
-            (get-in user-data [:response "errors"
-                               0 "message"]))
-       :user-not-found
-       (link-season-to-shows
-         (load-season year season)
-         (:shows (get-user-data user)))))))

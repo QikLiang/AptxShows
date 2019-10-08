@@ -23,7 +23,7 @@
                 (if (< (count $) 2) "#default=param" $)
                 (subs $ 1)
                 (str/split $ "&")
-                (map #(str/split % "=") $)
+                (map #(str/split % "=" -1) $)
                 (map #(update % 0 keyword) $)
                 (into {} $)))
 

@@ -1,10 +1,12 @@
 (ns seasonal-chart.template
-  (:require [hiccup.page :refer :all]))
+  (:require [hiccup.page :refer [html5 include-js
+                                 include-css]]))
 
 (defn home-page []
   (html5
     [:head
-     [:title "Home Page"]
+     [:title "APTX Shows - Condensing the dozens of shows
+             per season to the few you actually care about"]
      (include-css "css/style.css")]
     [:body
      [:div#center-strip

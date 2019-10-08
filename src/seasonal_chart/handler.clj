@@ -7,7 +7,8 @@
             [seasonal-chart.template :refer [home-page]]
             [ring.middleware.content-type
              :refer [wrap-content-type]]
-            [seasonal-chart.anilist-api :as anilist]))
+            [seasonal-chart.anilist-api :as anilist])
+  (:gen-class))
 
 (defroutes app-routes
   (GET "/" a (home-page))
@@ -35,7 +36,10 @@
 
 (defn start []
   (reset! server
-          (run-server #'app {:port 3000 :join false})))
+          (run-server #'app {:port (Integer/valueOf
+                                     (or (System/getenv "port")
+                                         "3000"))
+                             :join false})))
 
 (defn -main [& args]
   (start))
