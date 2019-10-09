@@ -234,7 +234,7 @@
     [:h1.show-item.load-message "Please wait while loading"]
     (= @shows :unhandled-error)
     [:h1.show-item.load-message "Something went wrong.
-                                 Please try again later."]
+                                 Please wait for it to be fixed."]
     (= @shows :user-not-found)
     [:h1.show-item.load-message "Username not found."]
     :else

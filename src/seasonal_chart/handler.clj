@@ -47,8 +47,9 @@
                                       (a/go
                                         (a/>! errchan
                                               (str/join
+                                                "/"
                                                 [year season
-                                                 user] "/")))
+                                                 user])))
                                       :unhandled-error)))))
   (route/resources "/" )
   (route/not-found "Not Found"))
