@@ -7,8 +7,27 @@
             [seasonal-chart.template :refer [home-page]]
             [ring.middleware.content-type
              :refer [wrap-content-type]]
-            [seasonal-chart.anilist-api :as anilist])
+            [seasonal-chart.anilist-api :as anilist]
+            [clojure.java.io :refer [writer]]
+            [clojure.core.async :as a]
+            [clojure.string :as str])
   (:gen-class))
+
+(def errchan (a/chan))
+
+(a/go
+  (with-open [wrtr (writer
+                     (str "error_log/"
+                          (str/replace
+                            (.toString (java.util.Date.))
+                            " " "_")
+                          ".log")
+                     :append true)]
+    (loop []
+      (when-let [v (a/<! errchan)]
+        (.write wrtr (str v "\n"))
+        (.flush wrtr)
+        (recur)))))
 
 (defroutes app-routes
   (GET "/" a (home-page))
@@ -21,8 +40,16 @@
        [year season user] (pr-str (do
                                     (println [year season
                                               user])
+                                    (try
                                     (anilist/load-results
-                                      year season user))))
+                                      year season user)
+                                    (catch Exception e
+                                      (a/go
+                                        (a/>! errchan
+                                              (str/join
+                                                [year season
+                                                 user] "/")))
+                                      :unhandled-error)))))
   (route/resources "/" )
   (route/not-found "Not Found"))
 

@@ -154,7 +154,7 @@
 (defn abreviate-title
   "insert ellipses smartly in long show titles"
   [title]
-  (if (< (count title) 30)
+  (if (< (count title) 25)
     title
     (let [abrev-start (or
                         (str/last-index-of title " " 15)
@@ -232,6 +232,9 @@
   (cond
     (and (sequential? @shows) (empty? @shows))
     [:h1.show-item.load-message "Please wait while loading"]
+    (= @shows :unhandled-error)
+    [:h1.show-item.load-message "Something went wrong.
+                                 Please try again later."]
     (= @shows :user-not-found)
     [:h1.show-item.load-message "Username not found."]
     :else
