@@ -206,8 +206,8 @@
                nodes { id }
              }
            }
-           stats {
-             animeListScores {
+           statistics {
+             anime {
                meanScore
                standardDeviation
              }
@@ -215,21 +215,23 @@
          }"
        vars {:String.user user}
        results (query q vars)
-       shows (-> results
-                 (get-in ["MediaListCollection" "lists"])
-                 (first)
-                 (get "entries"))
-       stats (get-in results ["User" "stats"
-                            "animeListScores"])
+       shows (get-in results ["MediaListCollection" "lists"
+                              0 "entries"])
+       stats (get-in results ["User" "statistics" "anime"])
        attach-score
        (fn [show]
          (assoc (show "media")
                 :score
                 (stddev-score stats (show "score"))))]
-   (get results :error ; pass up error if exist
-        {:shows (map attach-score shows)
-         :favorites (get-in results ["User" "favourites"])
-         :stats stats})))
+   (if (:error results)
+     (if (= "User not found"
+            (get-in results [:error :response "errors"
+                             0 "message"]))
+       {:error :user-not-found}
+       (:error results))
+     {:shows (map attach-score shows)
+      :favorites (get-in results ["User" "favourites"])
+      :stats stats})))
 
 (defn show-to-staff [show]
   (let [show-info {:title   (show "title")
@@ -312,6 +314,10 @@
   ([year season] (link-season-to-shows
                    (load-season year season)
                    (load-obj "data/most_popular.edn")))
-  ([year season user] (link-season-to-shows
-                        (load-season year season)
-                        (:shows (get-user-data user)))))
+  ([year season user]
+   (let [user-data (get-user-data user)]
+     (if (:error user-data)
+       (:error user-data)
+       (link-season-to-shows
+         (load-season year season)
+         (:shows user-data))))))
