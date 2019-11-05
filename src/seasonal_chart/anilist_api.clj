@@ -314,8 +314,10 @@
   ([year season] (link-season-to-shows
                    (load-season year season)
                    (load-obj "data/most_popular.edn")))
-  ([year season user]
-   (let [user-data (get-user-data user)]
+  ([year season user] (load-results year season user
+                                    (fn [f v] (f v))))
+  ([year season user cache-lookup]
+   (let [user-data (cache-lookup get-user-data user)]
      (if (:error user-data)
        (:error user-data)
        (link-season-to-shows

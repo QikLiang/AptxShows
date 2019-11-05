@@ -10,7 +10,8 @@
             [seasonal-chart.anilist-api :as anilist]
             [clojure.java.io :refer [writer]]
             [clojure.core.async :as a]
-            [clojure.string :as str])
+            [clojure.string :as str]
+            [clojure.core.cache.wrapped :as cache])
   (:gen-class))
 
 (def errchan (a/chan))
@@ -29,6 +30,11 @@
         (.flush wrtr)
         (recur)))))
 
+(def cache (cache/ttl-cache-factory {} :ttl (* 1000 60 60)))
+(defn cache-lookup [fetch-func ckey]
+  (cache/lookup-or-miss cache ckey fetch-func))
+
+
 (defroutes app-routes
   (GET "/" a (home-page))
   (GET "/api/getshows/:year/:season/"
@@ -37,20 +43,20 @@
                                (anilist/load-results
                                  year season))))
   (GET "/api/getshows/:year/:season/:user"
-       [year season user] (pr-str (do
-                                    (println [year season
-                                              user])
-                                    (try
-                                    (anilist/load-results
-                                      year season user)
-                                    (catch Exception e
-                                      (a/go
-                                        (a/>! errchan
-                                              (str/join
-                                                "/"
-                                                [year season
-                                                 user])))
-                                      :unhandled-error)))))
+       [year season user]
+       (pr-str (do
+                 (println [year season user])
+                 (try
+                   (anilist/load-results
+                     year season user
+                     cache-lookup)
+                   (catch Exception e
+                     (println e)
+                     (a/go
+                       (a/>! errchan
+                             (str/join "/"
+                                       [year season user])))
+                     :unhandled-error)))))
   (route/resources "/" )
   (route/not-found "Not Found"))
 

@@ -15,7 +15,8 @@
                  [ring/ring-defaults "0.3.2"]
                  [hiccup "1.0.5"]
                  [reagent "0.8.1"]
-                 [reagent-utils "0.3.3"]]
+                 [reagent-utils "0.3.3"]
+                 [org.clojure/core.cache "0.8.2"]]
   :main seasonal-chart.handler
   :plugins [[lein-ring "0.12.5"]
             [lein-cljsbuild "1.1.7"]
@@ -32,6 +33,5 @@
                    seasonal-chart.anilist-api
                    seasonal-chart.template]
              }}
-  :aliases {"fig"       ["trampoline" "run" "-m" "figwheel.main"]
-            "fig:build" ["trampoline" "run" "-m" "figwheel.main" "-b" "dev" "-r"]
+  :aliases {"fig"       ["trampoline" "run" "-m" "figwheel.main" "-b" "dev" "-r"]
             "recache"   ["exec" "-p" "update_cache.clj"]})
