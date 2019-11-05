@@ -11,9 +11,9 @@
 (def settings-ui
   (r/atom (cks/get :settings
                    {:preference
-                    {:story 1, :sound 1, :art 1, :cg 1,
-                     :music 1, :direction 1, :design 1,
-                     :animation 1, :production 1}
+                    {:story 1, :sound 0.5, :art 0.5, :cg 0.2,
+                     :music 0.5, :direction 1, :design 0.5,
+                     :animation 1, :production 0.2}
                     :auto-update true
                     :remember-preference true})))
 
