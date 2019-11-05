@@ -52,6 +52,7 @@
                  ["cg" :cg 1]
                  ["character", :design 1]
                  ["chief animation" :animation 1]
+                 ["chief director" :direction 1]
                  ["chief producer" :production 1]
                  ["color" :art 1]
                  ["director" :direction 1]
@@ -59,6 +60,7 @@
                  ["episode director" :direction 1]
                  ["in-between" :animation 0.2]
                  ["key animation" :animation 0.8]
+                 ["lead character" :design 1]
                  ["main animat" :animation 1]
                  ["music" :music 1]
                  ["original character" :design 1]
@@ -73,11 +75,13 @@
                  ["script" :story 1]
                  ["serial composition" :story 1]
                  ["series composition" :story 1]
+                 ["setting" :story 0.5]
                  ["sound" :sound 1]
                  ["storyboard" :story 0.8]
-                 ["supervis" :story 0.5]
+                 ["sub character" :design 0.6]
+                 ["supervis" :story 0.2]
                  ["theme song" :music 1]
-                 ["unit director" :direction 1]]
+                 ["unit director" :animation 0.5]]
         ; lexigraphically compare until one string runs out
         str-compare (fn [sa b] ; a is string, b still in list
                       (let [sb (first b)
