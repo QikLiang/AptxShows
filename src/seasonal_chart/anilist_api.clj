@@ -269,8 +269,7 @@
     (assoc info
            :type :staff
            :works works
-           :staff-id id
-           :weight (reduce + (map :score works)))))
+           :staff-id id)))
 
 (defn compile-list [staff-works]
   (fn [show]

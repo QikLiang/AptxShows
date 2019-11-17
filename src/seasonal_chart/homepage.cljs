@@ -208,8 +208,7 @@
    ^{:key (select-keys staff [:staff-id :weight])}
    [display-staff-entity staff]
    (r-map display-show-entity
-        (take 4 (sort-by :score (comp - compare)
-                         (staff :works))))])
+        (take 4 (rank/sort-works (staff :works))))])
 
 (defn display-show [show]
   [:div.show-item {:key (show "id")}
@@ -225,8 +224,7 @@
      [:div.show-title (get-in show ["title" "romaji"])]
      (into [:div.show-info-list]
            (r-map :staff-name display-staff-works
-                  (take 4 (sort-by :weight (comp - compare)
-                                   (show :list)))))]])
+                  (take 4 (rank/sort-staff (show :list)))))]])
 
 (defn show-list []
   (cond
@@ -242,7 +240,7 @@
           (->> @shows
                (map (partial rank/apply-preference
                              (:preference @settings)))
-               (sort-by :weight (comp - compare))
+               (rank/sort-shows)
                (r-map #(select-keys % ["id" :weight])
                       display-show)))))
 

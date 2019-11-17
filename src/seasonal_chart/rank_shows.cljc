@@ -115,17 +115,32 @@
 
 (defn rate-role [preference role]
   (let [[pos pos-type weight] (parse-position role)]
-    (* weight (preference pos-type))))
+    {:weight (* weight (preference pos-type))
+     :count 1}))
+(def combine-weights (partial merge-with +))
+(defn rate-roles [preference roles]
+  (reduce combine-weights
+          (map (partial rate-role preference) roles)))
+
+(defn rate-work [preference work]
+  (-> work
+      (assoc :weight (rate-roles preference (:roles work)))
+      (update-in [:weight :weight] * (:score work))))
+(defn rate-works [preference works]
+  (map (partial rate-work preference) works))
 
 (defn rate-staff-item
   [preference staff]
-  (let [rate-roles
-        #(reduce + (map (partial rate-role preference) %))
-        rate-work #(update % :score * (rate-roles (:roles %)))
-        work-rated (update staff :works #(map rate-work %))]
-    (update work-rated :weight *
-            (reduce + (map :score (:works work-rated)))
-            (rate-roles (:roles work-rated)))))
+  (let [work-rated (update staff :works
+                           (partial rate-works preference))
+        works-weight (reduce combine-weights
+                             (map :weight
+                                  (:works work-rated)))
+        cur-roles-weight (rate-roles preference
+                                     (:roles staff))]
+    (assoc work-rated :weight
+           (update works-weight :weight *
+                   (:weight cur-roles-weight)))))
 
 (defn rank-item
   "update the score in a single :list entry of a show"
@@ -141,4 +156,38 @@
   [preference show]
   (as-> show s
       (update s :list #(map (partial rank-item preference) %))
-      (assoc s :weight (reduce + (map :weight (:list s))))))
+      (assoc s :weight (reduce combine-weights
+                               (map :weight (:list s))))))
+
+(defn bayesian-average
+  "See e.g. https://fulmicoton.com/posts/bayesian_rating/
+   Given a certain number of observations, Bayesian
+   statistics predict that the true mean should be
+   approximated as:
+   true_mean = (expected_size*expected_mean
+                + num_observations*observations_mean)
+               / (num_observations + expected_size)
+   where expected_size is the average number of observations
+   and expected_mean is the prior belief of what the mean
+   should be. Since scores are adjusted to be standard
+   deviations from the mean, the expected mean should, in
+   theory, be zero. However, emperically I've found that to
+   not be the case because there's a correlation where staff
+   that made good works likely get more jobs. Also, it makes
+   sense to penaltize shows with a staff list you know
+   nothing about (or empty). This is done by assigning a
+   negative expected mean."
+  [{w :weight c :count} expected-mean expected-size]
+  (/ (+ (* w c) (* expected-mean expected-size))
+     (+ c expected-size)))
+
+(defn sort-by-weights [items expected-mean expected-size]
+  (sort-by #(bayesian-average (:weight %)
+                              expected-mean expected-size)
+           #(compare %2 %1)
+           items))
+
+; expected-size generated from my own profile
+(defn sort-works [works] (sort-by-weights works 0 2))
+(defn sort-staff [staff] (sort-by-weights staff 0 8))
+(defn sort-shows [shows] (sort-by-weights shows -0.29 40))
