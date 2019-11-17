@@ -34,4 +34,5 @@
                    seasonal-chart.template]
              }}
   :aliases {"fig"       ["trampoline" "run" "-m" "figwheel.main" "-b" "dev" "-r"]
-            "recache"   ["exec" "-p" "update_cache.clj"]})
+            "recache"   ["exec" "-p" "update_cache.clj"]
+            "jsbuild"   ["cljsbuild" "once"]})
