@@ -88,7 +88,7 @@ button:active {
 	font-size: .8em;
 }
 
-#settings-sliders {
+#settings-sliders, #filter-buttons {
 	display: flex;
 	flex-direction: row;
 	flex-wrap: wrap;
@@ -109,12 +109,21 @@ button:active {
 	width: 180px;
 }
 
+#filter-buttons {
+	font-size: 1.2em;
+}
+
 #update-button-div {
 	display: flex;
 	flex-direction: row;
 	justify-content: flex-end;
 	align-items: center;
-	font-size: 1.2em;
+}
+
+.checkbox-group {
+	display: flex;
+	flex-direction: row;
+	cursor: pointer;
 }
 
 input[type="checkbox"] {

@@ -10,12 +10,15 @@
 
 (def settings-ui
   (r/atom (cks/get :settings
-                   {:preference
-                    {:story 1, :sound 0.5, :art 0.5, :cg 0.2,
-                     :music 0.5, :direction 1, :design 0.5,
-                     :animation 1, :production 0.2}
+                   {:preference {:story 1, :sound 0.5,
+                                 :art 0.5, :cg 0.2,
+                                 :music 0.5, :direction 1,
+                                 :design 0.5, :animation 1,
+                                 :production 0.2}
                     :auto-update true
-                    :remember-preference true})))
+                    :remember-preference true
+                    :filters {:hide-adult true
+                              :hide-empty false}})))
 
 (def settings (r/atom @settings-ui))
 
@@ -93,9 +96,21 @@
                            (swap! settings-ui assoc-in
                                   [:preference param]
                                   (/ (.. e -target -value)
-                                     slider-range)))
-              :on-mouse-up auto-update!
-              :on-touch-end auto-update!}])])
+                                     slider-range)))}])])
+
+(defn setting-checkbox
+  [settings-path description element-id]
+    [:div.checkbox-group
+     {:on-click (fn [e]
+                  (swap! settings-ui update-in
+                         settings-path not)
+                  (auto-update!))}
+     [:input
+      {:type "checkbox"
+       :id element-id
+       :read-only true
+       :checked (get-in @settings-ui settings-path)}]
+     [:div.checkbox-desc description]])
 
 (defn show-header []
   [:div#header-content
@@ -133,23 +148,23 @@
             ["CG"            :cg]
             ["Production"    :production]])]
    [:hr]
+   [:div#filter-buttons
+    (setting-checkbox [:filters :hide-empty]
+                      "hide entries with no information"
+                      "hide-empty")
+    (setting-checkbox [:filters :hide-adult]
+                      "hide adult content entries"
+                      "hide-adult")]
+   [:hr]
    [:div#update-button-div
     [:button#update-button.button {:on-click update-shows!}
      "Apply Preferences"]
-    [:input#remember-preference
-     {:type "checkbox"
-      :checked (:remember-preference @settings-ui)
-      :on-change (fn [e]
-                   (swap! settings-ui update
-                          :remember-preference not))}]
-    [:div "Remember my preferences"]
-    [:input#auto-update
-     {:type "checkbox"
-      :checked (:auto-update @settings-ui)
-      :on-change (fn [e]
-                   (swap! settings-ui update :auto-update
-                          not))}]
-    [:div "Auto-update (uncheck if laggy)"]]])
+    (setting-checkbox [:remember-preference]
+                      "Remember my preferences"
+                      "remember-preference")
+    (setting-checkbox [:auto-update]
+                      "Auto-update (uncheck if laggy)"
+                      "auto-update")]])
 
 (defn abreviate-title
   "insert ellipses smartly in long show titles"
@@ -210,6 +225,13 @@
    (r-map display-show-entity
         (take 4 (rank/sort-works (staff :works))))])
 
+(defn filter-shows
+  "Just like the convention for filter, this returns false
+   if the show should be hidden."
+  [filters show]
+  (and (or (not (:hide-adult filters)) (not (show "isAdult")))
+       (or (not (:hide-empty filters)) (seq (show :list)))))
+
 (defn display-show [show]
   [:div.show-item {:key (show "id")}
    [:div.info-column
@@ -241,6 +263,8 @@
                (map (partial rank/apply-preference
                              (:preference @settings)))
                (rank/sort-shows)
+               (filter (partial filter-shows
+                                (:filters @settings)))
                (r-map #(select-keys % ["id" :weight])
                       display-show)))))
 

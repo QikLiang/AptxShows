@@ -126,6 +126,7 @@
                 }
               }
             }
+            isAdult
           }"
         vars {:page-type "media"
               :Int.year year
