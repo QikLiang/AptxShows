@@ -187,6 +187,9 @@
            #(compare %2 %1)
            items))
 
+(defn sort-roles [roles] (sort-by parse-position
+                                  #(compare %2 %1) roles))
+
 ; expected-size generated from my own profile
 (defn sort-works [works] (sort-by-weights works 0 2))
 (defn sort-staff [staff] (sort-by-weights staff 0 8))

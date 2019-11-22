@@ -218,7 +218,8 @@ input[type="checkbox"] {
 .entity-group .entity-name {
 	font-size: 1em;
 	line-height: 1;
-	height: 3em;
+	height: 3.1em;
+	overflow: hidden;
 }
 
 .show-entity .entity-name {
@@ -226,6 +227,7 @@ input[type="checkbox"] {
 }
 
 .staff-works .entity-desc {
+	margin-top: 0.3em;
 	text-decoration: underline;
 }
 

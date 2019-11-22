@@ -169,16 +169,21 @@
 (defn abreviate-title
   "insert ellipses smartly in long show titles"
   [title]
-  (if (< (count title) 25)
+  (if (< (count title) 30)
     title
-    (let [abrev-start (or
-                        (str/last-index-of title " " 15)
-                        10)
+    (let [
           last-space (str/last-index-of title " ")
           abrev-end (max (- (count title) 10)
-                         last-space)]
+                         (+ last-space 1))
+          ; minus 3 for the ellipses
+          max-abrev-start (- 25 (- (count title) abrev-end 3))
+          abrev-start (max
+                        (str/last-index-of
+                          title " " max-abrev-start)
+                        (- max-abrev-start 5))
+          ]
     (str (subs title 0 abrev-start)
-         " ... "
+         "\u200B...\u200B"
          (subs title abrev-end)))))
 
 (defn print-name
@@ -204,7 +209,7 @@
   (display-entity (show :image)
                   (abreviate-title
                     (get-in show [:title "romaji"]))
-                  (show :roles)
+                  (rank/sort-roles (show :roles))
                   {:key (show :show-id)
                    :class "show-entity"
                    :href (str "https://anilist.co/anime/"
