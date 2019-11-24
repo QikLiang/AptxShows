@@ -216,8 +216,9 @@
          }"
        vars {:String.user user}
        results (query q vars)
-       shows (get-in results ["MediaListCollection" "lists"
-                              0 "entries"])
+       shows (mapcat #(% "entries")
+                     (get-in results ["MediaListCollection"
+                                      "lists"]))
        stats (get-in results ["User" "statistics" "anime"])
        attach-score
        (fn [show]
