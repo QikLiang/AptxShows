@@ -181,16 +181,24 @@
   (/ (+ (* w c) (* expected-mean expected-size))
      (+ c expected-size)))
 
-(defn sort-by-weights [items expected-mean expected-size]
-  (sort-by #(bayesian-average (:weight %)
-                              expected-mean expected-size)
+(defn sort-by-weights [items expected-mean expected-size
+                       by-significance]
+  (let [bay-avg #(bayesian-average (:weight %)
+                                   expected-mean
+                                   expected-size)]
+  (sort-by (if by-significance
+             (comp #(Math/abs %) float bay-avg)
+             bay-avg)
            #(compare %2 %1)
-           items))
+           items)))
 
-(defn sort-roles [roles] (sort-by parse-position
+(defn sort-roles [roles] (sort-by (comp last parse-position)
                                   #(compare %2 %1) roles))
 
 ; expected-size generated from my own profile
-(defn sort-works [works] (sort-by-weights works 0 2))
-(defn sort-staff [staff] (sort-by-weights staff 0 8))
-(defn sort-shows [shows] (sort-by-weights shows -0.29 40))
+; show a staff's most prominant works instead of highest
+; rated works because users want to know if someone made
+; shows they've dropped as much as if they made great shows
+(defn sort-works [works] (sort-by-weights works 0 2 true))
+(defn sort-staff [staff] (sort-by-weights staff 0 8 true))
+(defn sort-shows [shows] (sort-by-weights shows -0.29 40 false))

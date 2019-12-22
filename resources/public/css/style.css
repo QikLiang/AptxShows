@@ -71,7 +71,6 @@ button:active {
 }
 
 .user-entry {
-	font-size: 1.2em;
 	display: flex;
 	flex-direction: row;
 	align-items: center;
@@ -92,25 +91,25 @@ button:active {
 	display: flex;
 	flex-direction: row;
 	flex-wrap: wrap;
-	justify-content: space-around;
+	justify-content: center;
 }
 
 .setting-slider {
 	display: flex;
 	flex-direction: row;
 	justify-content: space-between;
-	margin: 20px;
-	width: 400px;
-	font-size: 1.4em;
+	margin: 15px;
+	width: 340px;
+	font-size: 1.2em;
 }
 
 .setting-slider input {
-	margin-left: 20px;
-	width: 180px;
+	margin-left: 15px;
+	width: 150px;
 }
 
 #filter-buttons {
-	font-size: 1.2em;
+	font-size: 1.1em;
 }
 
 #update-button-div {
@@ -124,12 +123,12 @@ button:active {
 	display: flex;
 	flex-direction: row;
 	cursor: pointer;
+	margin-left: 10px;
 }
 
 input[type="checkbox"] {
 	zoom: 2.5;
 	margin: 0;
-	margin-left: 10px;
 }
 
 .show-item {

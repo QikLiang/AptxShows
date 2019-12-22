@@ -17,8 +17,8 @@
                                  :production 0.2}
                     :auto-update true
                     :remember-preference true
-                    :filters {:hide-adult true
-                              :hide-empty false}})))
+                    :filters {:adult false
+                              :empty true}})))
 
 (def settings (r/atom @settings-ui))
 
@@ -93,10 +93,12 @@
               :value (* slider-range
                         (get-in @settings-ui [:preference param]))
               :on-change (fn [e]
-                           (swap! settings-ui assoc-in
-                                  [:preference param]
-                                  (/ (.. e -target -value)
-                                     slider-range)))}])])
+                           (do
+                             (swap! settings-ui assoc-in
+                                    [:preference param]
+                                    (/ (.. e -target -value)
+                                       slider-range))
+                             (auto-update!)))}])])
 
 (defn setting-checkbox
   [settings-path description element-id]
@@ -115,8 +117,10 @@
 (defn show-header []
   [:div#header-content
    [:div#seasons-list
-    (r-map show-season-button [{:year 2019 :season "summer"}
-                               {:year 2019 :season "fall"}])]
+    (r-map show-season-button
+           [{:year 2019 :season "summer"}
+            {:year 2019 :season "fall"}
+            {:year 2020 :season "winter"}])]
    [:hr]
    [:div#user-entries
     [:form#anilist-entry.user-entry
@@ -149,12 +153,12 @@
             ["Production"    :production]])]
    [:hr]
    [:div#filter-buttons
-    (setting-checkbox [:filters :hide-empty]
-                      "hide entries with no information"
-                      "hide-empty")
-    (setting-checkbox [:filters :hide-adult]
-                      "hide adult content entries"
-                      "hide-adult")]
+    (setting-checkbox [:filters :empty]
+                      "empty entries"
+                      "empty-filter")
+    (setting-checkbox [:filters :adult]
+                      "adult content"
+                      "adult-filter")]
    [:hr]
    [:div#update-button-div
     [:button#update-button.button {:on-click update-shows!}
@@ -186,6 +190,14 @@
          "\u200B...\u200B"
          (subs title abrev-end)))))
 
+(defn abreviate-role
+  "Remove () at the end of a role for clarity"
+  [role]
+  (let [paren-ind (str/last-index-of role "(")]
+    (if paren-ind
+      (subs role 0 paren-ind)
+      role)))
+
 (defn print-name
   "Convert first and last name into string for display"
   [entity]
@@ -209,7 +221,10 @@
   (display-entity (show :image)
                   (abreviate-title
                     (get-in show [:title "romaji"]))
-                  (rank/sort-roles (show :roles))
+                  (->> (show :roles)
+                       (rank/sort-roles)
+                       (take 2)
+                       (map abreviate-role))
                   {:key (show :show-id)
                    :class "show-entity"
                    :href (str "https://anilist.co/anime/"
@@ -218,7 +233,7 @@
 (defn display-staff-entity [staff]
   (display-entity (staff :staff-img)
                   (print-name (staff :staff-name))
-                  (staff :roles)
+                  (rank/sort-roles (staff :roles))
                   {:class "staff-entity"
                    :href (str "https://anilist.co/staff/"
                               (staff :staff-id))}))
@@ -234,8 +249,8 @@
   "Just like the convention for filter, this returns false
    if the show should be hidden."
   [filters show]
-  (and (or (not (:hide-adult filters)) (not (show "isAdult")))
-       (or (not (:hide-empty filters)) (seq (show :list)))))
+  (and (or (:adult filters) (not (show "isAdult")))
+       (or (:empty filters) (seq (show :list)))))
 
 (defn display-show [show]
   [:div.show-item {:key (show "id")}
