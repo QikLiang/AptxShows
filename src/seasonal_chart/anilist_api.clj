@@ -179,8 +179,7 @@
   "Fetch all user data needed to personalize results."
   [user]
  (let [q "MediaListCollection(userName: $user
-                              type: ANIME
-                              status: COMPLETED){
+                              type: ANIME){
            lists {
              entries {
                score(format: POINT_100)
@@ -216,9 +215,10 @@
          }"
        vars {:String.user user}
        results (query q vars)
-       shows (mapcat #(% "entries")
-                     (get-in results ["MediaListCollection"
-                                      "lists"]))
+       shows (->> (get-in results ["MediaListCollection"
+                                   "lists"])
+                  (mapcat #(% "entries"))
+                  (filter #(not= 0 (% "score"))))
        stats (get-in results ["User" "statistics" "anime"])
        attach-score
        (fn [show]
