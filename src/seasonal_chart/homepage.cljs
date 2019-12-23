@@ -31,9 +31,9 @@
                 (into {} $)))
 
 (def cur-season
-  (atom (merge (cks/get :cur-season
-                        {:year 2019, :season "fall"})
-               url-hash)))
+  (r/atom (merge (cks/get :cur-season
+                          {:year "2020", :season "winter"})
+                 url-hash)))
 
 (def username (->> ""
                    (cks/get :username)
@@ -79,10 +79,14 @@
    (map (fn [v] ^{:key (keyf v)}[f v]) vs)))
 
 (defn show-season-button [{:keys [year season] :as entry}]
-  [:button.button.season-button
+  [:button
    {:on-click (fn [e] (do
                         (reset! cur-season entry)
-                        (get-shows!)))}
+                        (get-shows!)))
+    :class (str "button season-button"
+                (if (and (= (@cur-season :year) (str year))
+                         (= (@cur-season :season) season))
+                  " selected-season" ""))}
    (str(str/upper-case season) " " year)])
 
 (defn setting-slider [[desc param]]
@@ -118,9 +122,9 @@
   [:div#header-content
    [:div#seasons-list
     (r-map show-season-button
-           [{:year 2019 :season "summer"}
-            {:year 2019 :season "fall"}
-            {:year 2020 :season "winter"}])]
+           [{:year "2019" :season "summer"}
+            {:year "2019" :season "fall"}
+            {:year "2020" :season "winter"}])]
    [:hr]
    [:div#user-entries
     [:form#anilist-entry.user-entry
@@ -133,7 +137,7 @@
                                      (-> %
                                          .-target
                                          .-value))}]
-     [:button "Fetch my completed list"]]
+     [:button "Fetch my ratings"]]
     [:div#myanimelist-entry.user-entry
      "MyAnimeList: Support work in progress.\u00A0"
      [:a {:href "https://anilist.co/forum/thread/3393"}

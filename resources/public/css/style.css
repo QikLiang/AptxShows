@@ -42,6 +42,11 @@ body {
 	color: var(--word-color);
 }
 
+.selected-season {
+	border: 2px solid var(--hard-border-color);
+	background-color: white;
+}
+
 button {
 	padding: .3em;
 	border: 1px solid var(--highlight-background);
