@@ -1,44 +1,22 @@
-# seasonal-chart
+# About
 
-FIXME: description
+This repository hosts the source code to aptxshows.moe.
+It is written with a Clojure backend and a ClojureScript
+frontend. It is created mostly for my own personal interest
+and learning, but I suppose you can contribute if anyone
+is actually reading this.
 
 ## Installation
 
-Download from http://example.com/FIXME.
+Consult `setup.sh`.
 
 ## Usage
 
-FIXME: explanation
-
-    $ java -jar seasonal-chart-0.1.0-standalone.jar [args]
-
-## Options
-
-FIXME: listing of options this app accepts.
-
-## Examples
-
-...
-
-### Bugs
-
-...
-
-### Any Other Sections
-### That You Think
-### Might be Useful
-
-## License
-
-Copyright © 2019 FIXME
-
-This program and the accompanying materials are made available under the
-terms of the Eclipse Public License 2.0 which is available at
-http://www.eclipse.org/legal/epl-2.0.
-
-This Source Code may also be made available under the following Secondary
-Licenses when the conditions for such availability set forth in the Eclipse
-Public License, v. 2.0 are satisfied: GNU General Public License as published by
-the Free Software Foundation, either version 2 of the License, or (at your
-option) any later version, with the GNU Classpath Exception which is available
-at https://www.gnu.org/software/classpath/license.html.
+To run as a web server, consult `run.sh`.
+For debuging, I run `seasonal-chart.handler/start` in
+one REPL and run `lein fig` to start a figwheel session
+in another terminal.
+You might notice that the namespace for the project is
+uncreatively called `seasonal-chart`. I picked this name
+when creating the Leiningen project and was too lazy later
+to change it.
