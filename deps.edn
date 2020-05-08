@@ -12,5 +12,11 @@
         com.bhauman/rebel-readline-cljs {:mvn/version "0.1.4"}}
  :paths ["src" "resources" "target"]
  :aliases {:fig {:main-opts ["-m" "figwheel.main" "-b" "dev" "-r"]}
-           :ring {:main-opts ["-m" "seasonal-chart.handler" "-r"]}}
+           :ring {:main-opts ["-m" "seasonal-chart.handler" "-r"]}
+           :buildjs {:main-opts
+                     ["-m" "cljs.main"
+                      "--optimizations" "advanced"
+                      "-output-to"
+                      "target/public/cljs-out/homepage.js"
+                      "-c" "seasonal-chart.homepage"]}}
  }

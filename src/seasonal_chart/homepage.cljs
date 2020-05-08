@@ -8,17 +8,29 @@
 
 (def shows (r/atom []))
 
+(def settings-version 1)
+(if (> settings-version (cks/get :version 0))
+  (do
+    (cks/set! :version settings-version)
+    (cks/remove! :settings)))
+
+(def default-settings
+  {:preference {:story 1, :sound 0.5,
+                :art 0.5, :cg 0.2,
+                :music 0.5, :direction 1,
+                :design 0.5, :animation 1,
+                :production 0.2}
+   :auto-update true
+   :remember-preference true
+   :filters {:adult false
+             :empty true
+             :planning true
+             :watching true
+             :paused true
+             :completed false
+             :dropped false}})
 (def settings-ui
-  (r/atom (cks/get :settings
-                   {:preference {:story 1, :sound 0.5,
-                                 :art 0.5, :cg 0.2,
-                                 :music 0.5, :direction 1,
-                                 :design 0.5, :animation 1,
-                                 :production 0.2}
-                    :auto-update true
-                    :remember-preference true
-                    :filters {:adult false
-                              :empty true}})))
+  (r/atom (cks/get :settings default-settings)))
 
 (def settings (r/atom @settings-ui))
 
@@ -32,7 +44,7 @@
 
 (def cur-season
   (r/atom (merge (cks/get :cur-season
-                          {:year "2020", :season "winter"})
+                          {:year "2020", :season "spring"})
                  url-hash)))
 
 (def username (->> ""
@@ -156,13 +168,15 @@
             ["CG"            :cg]
             ["Production"    :production]])]
    [:hr]
-   [:div#filter-buttons
-    (setting-checkbox [:filters :empty]
-                      "empty entries"
-                      "empty-filter")
-    (setting-checkbox [:filters :adult]
-                      "adult content"
-                      "adult-filter")]
+   (into [:div#filter-buttons]
+         (for [[k label] [[:empty "empty entries"]
+                          [:adult "adult content"]
+                          [:planning "in Planning list"]
+                          [:watching "in Watching list"]
+                          [:completed "in Completed list"]
+                          [:dropped "in Dropped list"]]]
+           (setting-checkbox [:filters k] label
+                             (str/replace label " " "-"))))
    [:hr]
    [:div#update-button-div
     [:button#update-button.button {:on-click update-shows!}
@@ -249,12 +263,18 @@
    (r-map display-show-entity
         (take 4 (rank/sort-works (staff :works))))])
 
-(defn filter-shows
+(defn filter-show
   "Just like the convention for filter, this returns false
    if the show should be hidden."
   [filters show]
   (and (or (:adult filters) (not (show "isAdult")))
-       (or (:empty filters) (seq (show :list)))))
+       (or (:empty filters) (seq (show :list)))
+       (let [status-label {"PLANNING" :planning
+                           "COMPLETED" :completed
+                           "PAUSED" :paused
+                           "CURRENT" :watching
+                           "DROPPED" :dropped}]
+         (get filters (status-label (:status show)) true))))
 
 (defn display-show [show]
   [:div.show-item {:key (show "id")}
@@ -287,7 +307,7 @@
                (map (partial rank/apply-preference
                              (:preference @settings)))
                (rank/sort-shows)
-               (filter (partial filter-shows
+               (filter (partial filter-show
                                 (:filters @settings)))
                (r-map #(select-keys % ["id" :weight])
                       display-show)))))

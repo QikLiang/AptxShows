@@ -1,6 +1,5 @@
 (ns seasonal-chart.anilist-api
   (:require [ajax.core :refer [POST]]
-            [clojure.data.json :as json]
             [clojure.core.async :as a]
             [clojure.string :as str]))
 
@@ -175,65 +174,75 @@
   (/ (- score (stats "meanScore"))
      (stats "standardDeviation")))
 
+(defn make-user-query [user]
+  "Make call to Anilist API to fetch user data."
+  (let [q "MediaListCollection(userName: $user type: ANIME){
+            lists {
+              status
+              entries {
+                score(format: POINT_100)
+                media {
+                  title{english romaji}
+                  id
+                  coverImage { medium }
+                  staff {
+                    edges {
+                    role
+                    node { id }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          User(name: $user){
+            favourites {
+              staff { nodes { id } }
+              studios { nodes { id } }
+            }
+            statistics {
+              anime {
+                meanScore
+                standardDeviation
+              }
+            }
+          }"
+        vars {:String.user user}
+        results (query q vars)]
+    (if (:error results)
+      (if (= "User not found"
+             (get-in results [:error :response "errors"
+                           0 "message"]))
+        {:error :user-not-found}
+        (:error results))
+      results)))
+
 (defn get-user-data
   "Fetch all user data needed to personalize results."
   [user]
- (let [q "MediaListCollection(userName: $user
-                              type: ANIME){
-           lists {
-             entries {
-               score(format: POINT_100)
-               media {
-                 title{english romaji}
-                 id
-                 coverImage { medium }
-                 staff {
-                   edges {
-                     role
-                     node { id }
-                   }
-                 }
-               }
-             }
-           }
-         },
-         User(name: $user){
-           favourites {
-             staff {
-               nodes { id }
-             }
-             studios {
-               nodes { id }
-             }
-           }
-           statistics {
-             anime {
-               meanScore
-               standardDeviation
-             }
-           }
-         }"
-       vars {:String.user user}
-       results (query q vars)
-       shows (->> (get-in results ["MediaListCollection"
-                                   "lists"])
-                  (mapcat #(% "entries"))
-                  (filter #(not= 0 (% "score"))))
-       stats (get-in results ["User" "statistics" "anime"])
-       attach-score
-       (fn [show]
-         (assoc (show "media")
-                :score
-                (stddev-score stats (show "score"))))]
-   (if (:error results)
-     (if (= "User not found"
-            (get-in results [:error :response "errors"
-                             0 "message"]))
-       {:error :user-not-found}
-       (:error results))
-     {:shows (map attach-score shows)
-      :favorites (get-in results ["User" "favourites"])
-      :stats stats})))
+  (let [data (make-user-query user)
+        extract-entries
+        (fn [media-list]
+          (map #(assoc (% "media") :score (% "score"))
+               (media-list "entries")))
+        media-lists (get-in data ["MediaListCollection"
+                                  "lists"])
+        shows (->> media-lists
+                   (mapcat extract-entries)
+                   (filter #(not= 0 (% "score"))))
+        id-by-status (into {}
+                           (for [[k v] (group-by
+                                         #(% "status") media-lists)]
+                             [k (->> v
+                                     (mapcat #(% "entries"))
+                                     (map #(get-in % ["media" "id"]))
+                                     (set))]))
+        stats (get-in data ["User" "statistics" "anime"])]
+    (or (:error data)
+        {:shows shows
+         :favorites (get-in data ["User" "favourites"])
+         :stats stats
+         :id-by-status id-by-status})))
 
 (defn show-to-staff [show]
   (let [show-info {:title   (show "title")
@@ -278,10 +287,16 @@
     (assoc show :list
            (concat (compile-staff show staff-works)))))
 
-(defn mean [nums]
-  (if (empty? nums)
-    0.
-    (/ (reduce + nums) (count nums))))
+(defn attach-status
+  "add :status tag if show is in user's watching,
+   dropped, etc. list"
+  [id-by-status show]
+  (assoc show :status
+         (->> id-by-status
+              (filter (fn [[_ ids]]
+                        (contains? ids (show "id"))))
+              (first)
+              (first))))
 
 ; For debug
 (defn save-obj [obj file-name]
@@ -311,6 +326,10 @@
   (let [staff-works (shows-to-staff shows-seen)]
     (map (compile-list staff-works) new-season)))
 
+(defn apply-user-preferences [shows user-data]
+  (map (partial attach-status (:id-by-status user-data))
+       (link-season-to-shows shows (:shows user-data))))
+
 (defn load-results
   ([year season] (link-season-to-shows
                    (load-season year season)
@@ -319,8 +338,7 @@
                                     (fn [f v] (f v))))
   ([year season user cache-lookup]
    (let [user-data (cache-lookup get-user-data user)]
-     (if (:error user-data)
-       (:error user-data)
-       (link-season-to-shows
-         (load-season year season)
-         (:shows user-data))))))
+     (or (:error user-data)
+         (apply-user-preferences
+           (load-season year season)
+           user-data)))))
