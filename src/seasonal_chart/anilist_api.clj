@@ -45,7 +45,6 @@
                  :error-handler error-handler
                  :format :json,
                  :response-format :json})
-      ; unwrap outer map
       (a/<!! ch)))
 
 (defn get-page
@@ -67,18 +66,19 @@
   "Makes multiple Page queries and concats the results.
   Require vars to contain :page-type which unwraps the
   content of the page."
-  ([q vars] (get-all-pages q vars 1))
-  ([q vars page]
-   (let [this-page (get-page q (dissoc vars :page-type)
-                             50 page)
-         has-next  (get-in this-page ["Page"
-                                      "pageInfo"
-                                      "hasNextPage"])
-         results   ((this-page "Page") (vars :page-type))]
-     (if has-next
-       (concat results
-               (get-all-pages q vars (inc page)))
-       results))))
+  [q vars]
+  (loop [page 1
+         prev-res '()]
+    (let [this-page (get-page q (dissoc vars :page-type)
+                              50 page)
+          has-next  (get-in this-page ["Page"
+                                       "pageInfo"
+                                       "hasNextPage"])
+          result    ((this-page "Page") (vars :page-type))
+          results   (concat prev-res result)]
+      (if has-next
+        (recur (inc page) results)
+        results))))
 
 (defn format-season-show
   [show]
