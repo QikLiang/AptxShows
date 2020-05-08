@@ -32,6 +32,7 @@ body {
 #seasons-list {
 	display: flex;
 	flex-direction: row;
+	flex-wrap: wrap;
 }
 
 .season-button {
@@ -40,6 +41,7 @@ body {
 	font-size: 1.5em;
 	background-color: var(--page-color);
 	color: var(--word-color);
+	margin: 5px 0;
 }
 
 .selected-season {
@@ -124,11 +126,15 @@ button:active {
 	align-items: center;
 }
 
+#update-button {
+	margin-right: 15px;
+}
+
 .checkbox-group {
 	display: flex;
 	flex-direction: row;
 	cursor: pointer;
-	margin-left: 10px;
+	margin: 15px;
 }
 
 input[type="checkbox"] {
