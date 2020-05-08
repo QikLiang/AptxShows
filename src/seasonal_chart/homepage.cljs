@@ -92,7 +92,7 @@
 
 (defn show-season-button [{:keys [year season] :as entry}]
   [:button
-   {:on-click (fn [e] (do
+   {:on-click (fn [_] (do
                         (reset! cur-season entry)
                         (get-shows!)))
     :class (str "button season-button"
@@ -119,7 +119,7 @@
 (defn setting-checkbox
   [settings-path description element-id]
     [:div.checkbox-group
-     {:on-click (fn [e]
+     {:on-click (fn [_]
                   (swap! settings-ui update-in
                          settings-path not)
                   (auto-update!))}
@@ -136,7 +136,9 @@
     (r-map show-season-button
            [{:year "2019" :season "summer"}
             {:year "2019" :season "fall"}
-            {:year "2020" :season "winter"}])]
+            {:year "2020" :season "winter"}
+            {:year "2020" :season "spring"}
+            {:year "2020" :season "summer"}])]
    [:hr]
    [:div#user-entries
     [:form#anilist-entry.user-entry
