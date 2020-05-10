@@ -28,7 +28,8 @@
   :profiles
   {:dev {:dependencies [[javax.servlet/servlet-api "2.5"]
                         [ring/ring-mock "0.3.2"]
-                        [com.bhauman/figwheel-main "0.2.3"]]}
+                        [com.bhauman/figwheel-main "0.2.3"]
+                        [com.bhauman/rebel-readline-cljs "0.1.4"]]}
    :uberjar {:aot [seasonal-chart.handler
                    seasonal-chart.anilist-api
                    seasonal-chart.template]
