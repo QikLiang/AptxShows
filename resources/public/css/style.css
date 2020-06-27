@@ -147,6 +147,22 @@ input[type="checkbox"] {
 	margin: 0 2px;
 }
 
+.scroll-end-button {
+	background-color: var(--page-color);
+	border-radius: 70px;
+	border: 5px solid var(--hard-border-color);
+	position: fixed;
+	bottom: 100px;
+	right: 150px;
+	cursor: pointer;
+}
+
+.scroll-end-button * {
+	stroke: var(--word-color);
+	stroke-width: 5px;
+	fill: none;
+}
+
 .show-item {
 	display: flex;
 	flex-direction: row;

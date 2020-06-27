@@ -58,6 +58,10 @@
                    (js/decodeURIComponent)
                    (r/atom)))
 
+(def init-items 5)
+
+(def show-items (r/atom init-items))
+
 (defn update-shows! []
   (js/console.log (str (:preference @settings)))
   (reset! settings @settings-ui)
@@ -83,6 +87,7 @@
       (cks/set! :cur-season @cur-season)
       (cks/set! :username user))
     (reset! shows :loading)
+    (reset! show-items init-items)
     (GET url {:handler reset-state})
     (set! js/window.location.href
           (str "#year=" (@cur-season :year)
@@ -295,6 +300,18 @@
            (r-map :staff-name display-staff-works
                   (take 4 (rank/sort-staff (show :list)))))]])
 
+(defn scroll-end []
+  (r/after-render #(.scrollTo
+                     js/window 0
+                     (.. js/document -body -offsetHeight)))
+  (reset! show-items (count @shows)))
+
+(defn scroll-end-button []
+  [:svg.scroll-end-button {:width 100 :height 100
+                           :on-click scroll-end}
+   [:polyline {:points "15,30 50,60 85,30"}]
+   [:line {:x1 15 :y1 70 :x2 85 :y2 70}] ])
+
 (defn show-list []
   (cond
     (= @shows :loading)
@@ -329,13 +346,14 @@
        "See here for instructions."]]]
 
     :else
-    (into [:div.show-list]
+    (into [:div.show-list (scroll-end-button)]
           (->> @shows
                (map (partial rank/apply-preference
                              (:preference @settings)))
                (rank/sort-shows)
                (filter (partial filter-show
                                 (:filters @settings)))
+               (take @show-items)
                (r-map #(select-keys % ["id" :weight])
                       display-show)))))
 
@@ -344,3 +362,13 @@
 
 (r/render [show-list] (.getElementById js/document "app"))
 (get-shows!)
+
+(defn check-scroll []
+  (when (and
+           (seq? @shows)
+           (< @show-items (count @shows))
+           (> (+ (.-scrollY js/window) (.-innerHeight js/window))
+              (- (.. js/document -body -offsetHeight) 3000)))
+    (swap! show-items + init-items)))
+
+(.setInterval js/window check-scroll 1000)
