@@ -6,7 +6,7 @@
             [clojure.string :as str]
             [seasonal-chart.rank-shows :as rank]))
 
-(def shows (r/atom []))
+(def shows (r/atom :loading))
 
 (def settings-version 1)
 (if (> settings-version (cks/get :version 0))
@@ -42,9 +42,14 @@
                 (map #(update % 0 keyword) $)
                 (into {} $)))
 
+(def seasons-list [{:year "2019" :season "summer"}
+                   {:year "2019" :season "fall"}
+                   {:year "2020" :season "winter"}
+                   {:year "2020" :season "spring"}
+                   {:year "2020" :season "summer"}])
+
 (def cur-season
-  (r/atom (merge (cks/get :cur-season
-                          {:year "2020", :season "spring"})
+  (r/atom (merge (cks/get :cur-season (last seasons-list))
                  url-hash)))
 
 (def username (->> ""
@@ -77,6 +82,7 @@
       (cks/set! :settings @settings-ui)
       (cks/set! :cur-season @cur-season)
       (cks/set! :username user))
+    (reset! shows :loading)
     (GET url {:handler reset-state})
     (set! js/window.location.href
           (str "#year=" (@cur-season :year)
@@ -91,8 +97,8 @@
    (map (fn [v] ^{:key (keyf v)}[f v]) vs)))
 
 (defn show-season-button [{:keys [year season] :as entry}]
-  [:button
-   {:on-click (fn [_] (do
+  [:a
+   {:href (fn [_] (do
                         (reset! cur-season entry)
                         (get-shows!)))
     :class (str "button season-button"
@@ -133,12 +139,7 @@
 (defn show-header []
   [:div#header-content
    [:div#seasons-list
-    (r-map show-season-button
-           [{:year "2019" :season "summer"}
-            {:year "2019" :season "fall"}
-            {:year "2020" :season "winter"}
-            {:year "2020" :season "spring"}
-            {:year "2020" :season "summer"}])]
+    (r-map show-season-button seasons-list)]
    [:hr]
    [:div#user-entries
     [:form#anilist-entry.user-entry
@@ -151,8 +152,8 @@
                                      (-> %
                                          .-target
                                          .-value))}]
-     [:button "Fetch my ratings"]]
-    [:div#myanimelist-entry.user-entry
+     [:button.button "Fetch my profile"]]
+    [:p#myanimelist-entry
      "MyAnimeList: Support work in progress.\u00A0"
      [:a {:href "https://anilist.co/forum/thread/3393"}
       " In the meantime, it's possible to export data
@@ -296,13 +297,37 @@
 
 (defn show-list []
   (cond
-    (and (sequential? @shows) (empty? @shows))
+    (= @shows :loading)
     [:h1.show-item.load-message "Please wait while loading"]
+
     (= @shows :unhandled-error)
     [:h1.show-item.load-message "Something went wrong.
                                  Please wait for it to be fixed."]
+
     (= @shows :user-not-found)
-    [:h1.show-item.load-message "Username not found."]
+    [:div.show-item.error-message
+     [:h1 "Username not found."]
+     [:hr]
+     [:p "This website gives recommendations based on what it"
+      "can understand from your "
+      [:a {:href "anilist.co"} "Anilist"]
+      " profile. However, there is no Anilist user named "
+      \" @username \"]
+     [:p
+      [:a.button
+       {:href (str "/#year=" (@cur-season :year)
+                   "&season=" (@cur-season :season)
+                   "&username=")
+        :on-click #(update-shows!)}
+       "Back to default view"]
+      "The default view makes recommendations based on the "
+      "top 1,000 most popular shows."]
+     [:h3 "For MyAnimeList users"]
+     [:p "It is possible to create an Anilist profile and "
+      "export the shows you've seen from MAL. "
+      [:a {:href "https://anilist.co/forum/thread/3393"}
+       "See here for instructions."]]]
+
     :else
     (into [:div.show-list]
           (->> @shows

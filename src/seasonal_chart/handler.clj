@@ -1,12 +1,10 @@
 (ns seasonal-chart.handler
-  (:require [compojure.core :refer :all]
+  (:require [compojure.core :refer [defroutes GET]]
             [compojure.route :as route]
             [ring.middleware.defaults
              :refer [wrap-defaults site-defaults]]
             [org.httpkit.server :refer [run-server]]
             [seasonal-chart.template :refer [home-page]]
-            [ring.middleware.content-type
-             :refer [wrap-content-type]]
             [seasonal-chart.anilist-api :as anilist]
             [clojure.java.io :refer [writer]]
             [clojure.core.async :as a]
@@ -62,7 +60,6 @@
 
 (def app
     (wrap-defaults
-  ;(wrap-content-type app-routes)
   app-routes
       site-defaults))
 

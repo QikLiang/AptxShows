@@ -79,21 +79,22 @@
       (if has-next
         (recur (inc page) results)
         results))))
+(def a "asdf")
 
 (defn format-season-show
   [show]
-  (assoc show
-         "staff"
-         (update-map
-           (group-by #(get-in % ["node" "id"])
-                     (get-in show ["staff" "edges"]))
-           (fn [staffs]
-             {:roles (map #(% "role") staffs)
-              :staff-name (get-in (first staffs) ["node"
-                                                  "name"])
-              :staff-img (get-in (first staffs) ["node"
-                                                 "image"
-                                                 "medium"])}))))
+  (-> show
+      (assoc "staff"
+             (update-map
+               (group-by #(get-in % ["node" "id"])
+                         (get-in show ["staff" "edges"]))
+               (fn [staffs]
+                 {:roles (map #(% "role") staffs)
+                  :staff-name (get-in (first staffs) ["node"
+                                                      "name"])
+                  :staff-img (get-in (first staffs) ["node"
+                                                     "image"
+                                                     "medium"])})))))
 
 (defn get-season
   "Return all airing shows for a season."
@@ -111,6 +112,10 @@
               large
             }
             format
+            relations{
+              nodes{id}
+              edges{relationType}
+            }
             staff {
               edges {
                 role
@@ -238,11 +243,12 @@
                                      (map #(get-in % ["media" "id"]))
                                      (set))]))
         stats (get-in data ["User" "statistics" "anime"])]
-    (or (:error data)
-        {:shows shows
-         :favorites (get-in data ["User" "favourites"])
-         :stats stats
-         :id-by-status id-by-status})))
+    (if (:error data)
+      data
+      {:shows shows
+       :favorites (get-in data ["User" "favourites"])
+       :stats stats
+       :id-by-status id-by-status})))
 
 (defn show-to-staff [show]
   (let [show-info {:title   (show "title")
@@ -287,16 +293,22 @@
     (assoc show :list
            (concat (compile-staff show staff-works)))))
 
+(defn key-containing
+  "Takes a map where the values are collections, and
+   return the first key in interation order that such
+   that the value contains the given object."
+  [m v]
+  (->> m
+       (filter (fn [[_ vs]] (contains? vs v)))
+       (first)
+       (first)))
+
 (defn attach-status
   "add :status tag if show is in user's watching,
    dropped, etc. list"
   [id-by-status show]
   (assoc show :status
-         (->> id-by-status
-              (filter (fn [[_ ids]]
-                        (contains? ids (show "id"))))
-              (first)
-              (first))))
+         (key-containing id-by-status (show "id"))))
 
 ; For debug
 (defn save-obj [obj file-name]
