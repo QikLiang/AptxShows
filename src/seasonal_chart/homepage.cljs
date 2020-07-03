@@ -103,9 +103,12 @@
 
 (defn show-season-button [{:keys [year season] :as entry}]
   [:a
-   {:href (fn [_] (do
-                        (reset! cur-season entry)
-                        (get-shows!)))
+   {:on-click (fn [_]
+                (reset! cur-season entry)
+                (get-shows!))
+    :href (str "/#year=" year
+               "&season=" season
+               "&username=" @username)
     :class (str "button season-button"
                 (if (and (= (@cur-season :year) (str year))
                          (= (@cur-season :season) season))
@@ -307,10 +310,10 @@
   (reset! show-items (count @shows)))
 
 (defn scroll-end-button []
-  [:svg.scroll-end-button {:width 100 :height 100
+  [:svg.scroll-end-button {:width 50 :height 50
                            :on-click scroll-end}
-   [:polyline {:points "15,30 50,60 85,30"}]
-   [:line {:x1 15 :y1 70 :x2 85 :y2 70}] ])
+   [:polyline {:points "7,15 25,30 42,15"}]
+   [:line {:x1 7 :y1 35 :x2 42 :y2 35}] ])
 
 (defn show-list []
   (cond
