@@ -9,26 +9,59 @@
 (def shows (r/atom :loading))
 
 (def settings-version 1)
-(if (> settings-version (cks/get :version 0))
-  (do
-    (cks/set! :version settings-version)
-    (cks/remove! :settings)))
+(when (> settings-version (cks/get :version 0))
+  (cks/set! :version settings-version)
+  (cks/remove! :settings))
 
 (def default-settings
-  {:preference {:story 1, :sound 0.5,
-                :art 0.5, :cg 0.2,
-                :music 0.5, :direction 1,
-                :design 0.5, :animation 1,
-                :production 0.2}
+  {:preference {:narative {:expand false
+                           :story 1}
+                :visuals  {:expand false
+                           :art 0.5 :design 0.5 :animation 1}
+                :audio    {:expand false
+                           :music 0.5 :sound 0.2}
+                :prod     {:expand false
+                           :direction 1 :production 0.2}}
    :auto-update true
    :remember-preference true
-   :filters {:adult false
-             :empty true
-             :planning true
-             :watching true
-             :paused true
-             :completed false
-             :dropped false}})
+   :filters {:content {:expand false
+                       :adult false
+                       :empty true}
+             :show-in {:expand false
+                       :planning true
+                       :watching true
+                       :paused true
+                       :completed false
+                       :dropped false}}})
+
+(def descriptions ; map settings keys to displayed text
+  {:narative {:title "Narative"
+              :story {:title "Story"}}
+   :visuals  {:title "Visuals"
+              :art {:title "Art"}
+              :animation {:title "Animation"}
+              :design {:title "Character Design"}}
+   :audio    {:title "Audio"
+              :music {:title "Music"}
+              :sound {:title "Sound Directing"}}
+   :prod     {:title "Production"
+              :production {:title "Producer"}
+              :direction {:title "Director"}}
+   :filters {:content {:title "Content"
+                       :empty {:title "empty entries"}
+                       :adult {:title "adult content"}}
+             :show-in {:title "Entries in my..."
+                       :planning  {:title "Planning list"}
+                       :watching  {:title "Watching list"}
+                       :paused    {:title "On Hold list"}
+                       :completed {:title "Completed list"}
+                       :dropped   {:title "Dropped list"}}}
+   :remember-preference {:title "Remember my preferences"}
+   :auto-update {:title "Auto-update (uncheck if laggy)"}})
+
+(defn get-desc [path]
+  (:title (get-in descriptions path)))
+
 (def settings-ui
   (r/atom (cks/get :settings default-settings)))
 
@@ -115,23 +148,62 @@
                   " selected-season" ""))}
    (str(str/upper-case season) " " year)])
 
-(defn setting-slider [[desc param]]
+(defn update-category [category old-val new-val]
+  (let [mult (/ (double new-val) old-val)]
+    (into {} (for [[k v] category]
+               [k (if (number? v) (* mult v) v)]))))
+
+(defn setting-slider [param]
   [:div.setting-slider
-   [:div.slider-desc desc]
-   (let [slider-range 100]
+   (let [slider-range 100
+         header? (= 1 (count param))
+         path (cons :preference param)
+         value (if header?
+                 (apply max (-> @settings-ui
+                                (get-in path)
+                                (dissoc :expand)
+                                (vals)))
+                 (get-in @settings-ui path))]
      [:input {:type "range" :min 0 :max slider-range
-              :value (* slider-range
-                        (get-in @settings-ui [:preference param]))
+              :value (* slider-range value)
               :on-change (fn [e]
-                           (do
-                             (swap! settings-ui assoc-in
-                                    [:preference param]
-                                    (/ (.. e -target -value)
-                                       slider-range))
-                             (auto-update!)))}])])
+                           (.-target e)
+                           (let [input (.. e -target -value)
+                                 new-val (/ input slider-range)]
+                             (if header?
+                               (swap! settings-ui update-in
+                                      [:preference (first param)]
+                                      update-category value new-val)
+                               (swap! settings-ui assoc-in
+                                      path new-val)))
+                           (auto-update!))}])
+   ; put slider before description to use CSS adjacent sibling
+   ; selector, use flex-direction to fix presentation order
+   [:div.slider-desc (get-desc param)]])
+
+(defn expandable-container [header expand-setting content]
+  (let [expanded (get-in @settings-ui expand-setting)]
+  [:div.expandable
+   [:div.expandable-header
+    [:svg.expand-button
+     {:width 30 :height 30
+      :on-click (fn [_]
+                  (swap! settings-ui update-in expand-setting not)
+                  (auto-update!))}
+     [:line {:x1 5 :y1 15 :x2 25 :y2 15}]
+     (if (not expanded) [:line {:x1 15 :y1 5 :x2 15 :y2 25}])]
+    header]
+   (if expanded
+     [:div.expandable-content content])]))
+
+(defn expandable-slider [[root-param sub-params]]
+  [expandable-container [setting-slider [root-param]]
+   [:preference root-param :expand]
+   (r-map first #(setting-slider [root-param (first %)])
+          (dissoc sub-params :avg :expand))])
 
 (defn setting-checkbox
-  [settings-path description element-id]
+  [settings-path]
     [:div.checkbox-group
      {:on-click (fn [_]
                   (swap! settings-ui update-in
@@ -139,10 +211,17 @@
                   (auto-update!))}
      [:input
       {:type "checkbox"
-       :id element-id
        :read-only true
        :checked (get-in @settings-ui settings-path)}]
-     [:div.checkbox-desc description]])
+     [:div.checkbox-desc (get-desc settings-path)]])
+
+(defn expandable-checkboxes [header]
+  [expandable-container
+   [:div.filters-header (get-desc header)]
+   (conj header :expand)
+   (r-map #(setting-checkbox (conj header %))
+          (keys (dissoc (get-in default-settings header)
+                        :expand)))])
 
 (defn show-header []
   [:div#header-content
@@ -168,44 +247,24 @@
        to an Anilist account."]]]
    [:hr]
    [:div#settings-sliders
-    (r-map setting-slider
-           [["Directing"     :direction]
-            ["Animation"     :animation]
-            ["Story"         :story]
-            ["Art"           :art]
-            ["Music"         :music]
-            ["Visual Design" :design]
-            ["Sound"         :sound]
-            ["CG"            :cg]
-            ["Production"    :production]])]
+    (r-map first expandable-slider (:preference default-settings))]
    [:hr]
-   (into [:div#filter-buttons]
-         (for [[k label] [[:empty "empty entries"]
-                          [:adult "adult content"]
-                          [:planning "in Planning list"]
-                          [:watching "in Watching list"]
-                          [:completed "in Completed list"]
-                          [:dropped "in Dropped list"]]]
-           (setting-checkbox [:filters k] label
-                             (str/replace label " " "-"))))
+   [:div#filter-buttons
+    (r-map #(expandable-checkboxes [:filters %])
+           (keys (:filters default-settings)))]
    [:hr]
    [:div#update-button-div
     [:button#update-button.button {:on-click update-shows!}
      "Apply Preferences"]
-    (setting-checkbox [:remember-preference]
-                      "Remember my preferences"
-                      "remember-preference")
-    (setting-checkbox [:auto-update]
-                      "Auto-update (uncheck if laggy)"
-                      "auto-update")]])
+    (setting-checkbox [:remember-preference])
+    (setting-checkbox [:auto-update])]])
 
 (defn abreviate-title
   "insert ellipses smartly in long show titles"
   [title]
   (if (< (count title) 30)
     title
-    (let [
-          last-space (str/last-index-of title " ")
+    (let [last-space (str/last-index-of title " ")
           abrev-end (max (- (count title) 10)
                          (+ last-space 1))
           ; minus 3 for the ellipses
@@ -213,8 +272,7 @@
           abrev-start (max
                         (str/last-index-of
                           title " " max-abrev-start)
-                        (- max-abrev-start 5))
-          ]
+                        (- max-abrev-start 5))]
     (str (subs title 0 abrev-start)
          "\u200B...\u200B"
          (subs title abrev-end)))))
@@ -352,10 +410,12 @@
     (into [:div.show-list (scroll-end-button)]
           (->> @shows
                (map (partial rank/apply-preference
-                             (:preference @settings)))
+                             (->> @settings
+                                  :preference
+                                  vals
+                                  (apply merge))))
                (rank/sort-shows)
-               (filter (partial filter-show
-                                (:filters @settings)))
+               (filter (partial filter-show (:filters @settings)))
                (take @show-items)
                (r-map #(select-keys % ["id" :weight])
                       display-show)))))
