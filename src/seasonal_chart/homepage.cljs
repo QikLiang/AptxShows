@@ -2,6 +2,7 @@
   (:require [reagent.core :as r]
             [reagent.cookies :as cks]
             [ajax.core :refer [GET]]
+            [clojure.walk :refer [postwalk]]
             [cljs.reader :as reader]
             [clojure.string :as str]
             [seasonal-chart.rank-shows :as rank]))
@@ -13,57 +14,68 @@
   (cks/set! :version settings-version)
   (cks/remove! :settings))
 
-(def default-settings
-  {:preference {:narative {:expand false
-                           :story 1}
-                :visuals  {:expand false
-                           :art 0.5 :design 0.5 :animation 1}
-                :audio    {:expand false
-                           :music 0.5 :sound 0.2}
-                :prod     {:expand false
-                           :direction 1 :production 0.2}}
-   :auto-update true
-   :remember-preference true
-   :filters {:content {:expand false
-                       :adult false
-                       :empty true}
-             :show-in {:expand false
-                       :planning true
-                       :watching true
-                       :paused true
-                       :completed false
-                       :dropped false}}})
-
 (def descriptions ; map settings keys to displayed text
-  {:narative {:title "Narative"
-              :story {:title "Story"}}
-   :visuals  {:title "Visuals"
-              :art {:title "Art"}
-              :animation {:title "Animation"}
-              :design {:title "Character Design"}}
-   :audio    {:title "Audio"
-              :music {:title "Music"}
-              :sound {:title "Sound Directing"}}
-   :prod     {:title "Production"
-              :production {:title "Producer"}
-              :direction {:title "Director"}}
+  {:preference {:narative {:title "Narative"
+                           :story {:title "Story"
+                                   :default 1}
+                           :script {:title "Script"
+                                    :default 0.5}
+                           :series {:title "Series Composition"
+                                    :default 0.7}}
+                :visuals  {:title "Visuals"
+                           :art {:title "Art"
+                                 :default 0.5}
+                           :animation {:title "Animation"
+                                       :default 1}
+                           :design {:title "Character Design"
+                                    :default 0.5}
+                           :cg {:title "CGI"
+                                :default 0.3}}
+                :audio    {:title "Audio"
+                           :music {:title "Music"
+                                   :default 0.5}
+                           :sound {:title "Sound Directing"
+                                   :default 0.2}}
+                :prod     {:title "Production"
+                           :production {:title "Producer"
+                                        :default 0.2}
+                           :direction {:title "Director"
+                                       :default 1}}}
    :filters {:content {:title "Content"
-                       :empty {:title "empty entries"}
-                       :adult {:title "adult content"}}
+                       :expand {:default false}
+                       :empty {:title "empty entries"
+                               :default true}
+                       :adult {:title "adult content"
+                               :default false}}
              :show-in {:title "Entries in my..."
-                       :planning  {:title "Planning list"}
-                       :watching  {:title "Watching list"}
-                       :paused    {:title "On Hold list"}
-                       :completed {:title "Completed list"}
-                       :dropped   {:title "Dropped list"}}}
-   :remember-preference {:title "Remember my preferences"}
-   :auto-update {:title "Auto-update (uncheck if laggy)"}})
+                       :expand {:default false}
+                       :planning  {:title "Planning list"
+                                   :default true}
+                       :watching  {:title "Watching list"
+                                   :default true}
+                       :paused    {:title "On Hold list"
+                                   :default true}
+                       :completed {:title "Completed list"
+                                   :default false}
+                       :dropped   {:title "Dropped list"
+                                   :default false}}}
+   :remember-preference {:title "Remember my preferences"
+                         :default true}
+   :auto-update {:title "Auto-update (uncheck if laggy)"
+                 :default true}})
+
+(defn get-defaults [descriptions]
+  (postwalk (fn [obj] (cond
+                        (not (map? obj)) obj
+                        (contains? obj :default) (:default obj)
+                        :else (dissoc obj :title)))
+            descriptions))
 
 (defn get-desc [path]
   (:title (get-in descriptions path)))
 
 (def settings-ui
-  (r/atom (cks/get :settings default-settings)))
+  (r/atom (cks/get :settings (get-defaults descriptions))))
 
 (def settings (r/atom @settings-ui))
 
@@ -98,7 +110,7 @@
 (defn update-shows! []
   (js/console.log (str (:preference @settings)))
   (reset! settings @settings-ui)
-  (when (:remember-preference settings)
+  (when (:remember-preference @settings)
     (cks/set! :settings @settings)))
 
 (defn auto-update! []
@@ -149,21 +161,22 @@
    (str(str/upper-case season) " " year)])
 
 (defn update-category [category old-val new-val]
-  (let [mult (/ (double new-val) old-val)]
-    (into {} (for [[k v] category]
-               [k (if (number? v) (* mult v) v)]))))
+  (if (= old-val 0)
+    (into {} (for [[k v] category] [k (if (number? v) new-val v)]))
+    (let [mult (/ (double new-val) old-val)]
+      (into {} (for [[k v] category]
+                 [k (if (number? v) (* mult v) v)])))))
 
-(defn setting-slider [param]
+(defn setting-slider [path]
   [:div.setting-slider
    (let [slider-range 100
-         header? (= 1 (count param))
-         path (cons :preference param)
+         category (get-in @settings-ui path)
+         header? (map? category)
          value (if header?
-                 (apply max (-> @settings-ui
-                                (get-in path)
+                 (apply max (-> category
                                 (dissoc :expand)
                                 (vals)))
-                 (get-in @settings-ui path))]
+                 category)]
      [:input {:type "range" :min 0 :max slider-range
               :value (* slider-range value)
               :on-change (fn [e]
@@ -172,14 +185,15 @@
                                  new-val (/ input slider-range)]
                              (if header?
                                (swap! settings-ui update-in
-                                      [:preference (first param)]
+                                      path
                                       update-category value new-val)
                                (swap! settings-ui assoc-in
                                       path new-val)))
-                           (auto-update!))}])
+                           (auto-update!))
+              }])
    ; put slider before description to use CSS adjacent sibling
    ; selector, use flex-direction to fix presentation order
-   [:div.slider-desc (get-desc param)]])
+   [:div.slider-desc (get-desc path)]])
 
 (defn expandable-container [header expand-setting content]
   (let [expanded (get-in @settings-ui expand-setting)]
@@ -197,10 +211,11 @@
      [:div.expandable-content content])]))
 
 (defn expandable-slider [[root-param sub-params]]
-  [expandable-container [setting-slider [root-param]]
+  [expandable-container [setting-slider [:preference root-param]]
    [:preference root-param :expand]
-   (r-map first #(setting-slider [root-param (first %)])
-          (dissoc sub-params :avg :expand))])
+   (r-map first
+          #(setting-slider [:preference root-param (first %)])
+          (dissoc sub-params :title :expand))])
 
 (defn setting-checkbox
   [settings-path]
@@ -220,8 +235,8 @@
    [:div.filters-header (get-desc header)]
    (conj header :expand)
    (r-map #(setting-checkbox (conj header %))
-          (keys (dissoc (get-in default-settings header)
-                        :expand)))])
+          (keys (dissoc (get-in descriptions header)
+                        :expand :title)))])
 
 (defn show-header []
   [:div#header-content
@@ -247,11 +262,11 @@
        to an Anilist account."]]]
    [:hr]
    [:div#settings-sliders
-    (r-map first expandable-slider (:preference default-settings))]
+    (r-map first expandable-slider (:preference descriptions))]
    [:hr]
    [:div#filter-buttons
     (r-map #(expandable-checkboxes [:filters %])
-           (keys (:filters default-settings)))]
+           (keys (:filters descriptions)))]
    [:hr]
    [:div#update-button-div
     [:button#update-button.button {:on-click update-shows!}

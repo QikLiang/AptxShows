@@ -6,7 +6,7 @@ body{
 	--highlight-color: white;
 	--shadow-color: #2d1d15;
 	--hard-border-color: #24262b;
-	--accent-background: #d2b550;
+	--accent-background: #fedd00;
 }
 body {
 	background-color: var(--bg-color);
@@ -103,21 +103,61 @@ hr {
 	display: flex;
 	flex-direction: row;
 	flex-wrap: wrap;
-	justify-content: center;
+	justify-content: left;
+	align-items: flex-start;
+}
+
+.expandable {
+	display: flex;
+	flex-direction: column;
+	background-color: var(--accent-background);
+	border-radius: 10px;
+	width: 340px;
+	margin: 10px;
+	padding: 10px;
+}
+
+.expandable-header {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+}
+
+.expand-button {
+	margin: 5px;
+	stroke: black;
+	stroke-width: 5px;
+	cursor: pointer;
+}
+
+.expand-button:hover {
+	background-color: white;
+	border-radius: 5px;
+}
+
+.expandable-content .slider-desc {
+	width: 150px;
+	text-align: end;
+	line-height: 85%;
+	margin-top: 8px;
 }
 
 .setting-slider {
 	display: flex;
-	flex-direction: row;
-	justify-content: space-between;
-	margin: 15px;
-	width: 340px;
+	flex-direction: row-reverse;
+	align-items: baseline;
 	font-size: 1.2em;
+	cursor: default;
+}
+
+.setting-slider input:hover + .slider-desc {
+	text-decoration: underline;
 }
 
 .setting-slider input {
 	margin-left: 15px;
 	width: 150px;
+	cursor: pointer;
 }
 
 #filter-buttons {

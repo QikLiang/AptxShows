@@ -43,8 +43,8 @@
   "Given a staff credit position, parse into semantic terms,
    returning [:position weight] where weight is 0-1"
   [position]
-  (let [pos (str/lower-case position)
-        mapping [["animation" :animation 1]
+  (let [mapping [["action animation director" :animation 1]
+                 ["animation" :animation 1]
                  ["art" :art 1]
                  ["assistant animation" :animation 0.8]
                  ["assistant director" :direction 0.8]
@@ -62,6 +62,7 @@
                  ["key animation" :animation 0.8]
                  ["lead character" :design 1]
                  ["main animat" :animation 1]
+                 ["monster design" :design 0.7]
                  ["music" :music 1]
                  ["original character" :design 1]
                  ["original creator" :story 1]
@@ -70,14 +71,14 @@
                  ["producer" :production 1]
                  ["prop design" :design 1]
                  ["recording" :sound 0.8]
-                 ["scenario" :story 1]
-                 ["screenplay" :story 1]
-                 ["script" :story 1]
-                 ["serial composition" :story 1]
-                 ["series composition" :story 1]
+                 ["scenario" :script 1]
+                 ["screenplay" :script 1]
+                 ["script" :script 1]
+                 ["serial composition" :series 1]
+                 ["series composition" :series 1]
                  ["setting" :story 0.5]
                  ["sound" :sound 1]
-                 ["storyboard" :story 0.8]
+                 ["storyboard" :script 0.8]
                  ["sub character" :design 0.6]
                  ["supervis" :story 0.2]
                  ["theme song" :music 1]
@@ -85,8 +86,7 @@
         ; lexigraphically compare until one string runs out
         str-compare (fn [sa b] ; a is string, b still in list
                       (let [sb (first b)
-                            len (apply min
-                                       (map count [sa sb]))]
+                            len (apply min (map count [sa sb]))]
                         (apply compare
                                (map #(subs % 0 len)
                                     [sa sb]))))
@@ -95,23 +95,12 @@
         eps-list (parse-num-eps position)
         num-eps (if (empty? eps-list) 0 (apply max eps-list))
         ; round up to the nearest multiple of 13
-        max-num-eps (+ num-eps (mod (- num-eps) 13))
-        ]
+        max-num-eps (+ num-eps (mod (- num-eps) 13))]
     (cond
       (< index 0) [position :none 0]
       (<= num-eps 0) (nth mapping index)
       :else (update (nth mapping index) 2
                     * (/ (count eps-list) max-num-eps)))))
-
-;(def preference {:story 1
-                 ;:sound 1
-                 ;:art 1
-                 ;:music 1
-                 ;:direction 1
-                 ;:design 1
-                 ;:animation 1
-                 ;:production 1
-                 ;:cg 1})
 
 (defn rate-role [preference role]
   (let [[pos pos-type weight] (parse-position role)]
@@ -132,7 +121,7 @@
 (defn rate-staff-item
   [preference staff]
   (let [work-rated (update staff :works
-                           (partial rate-works preference))
+                           #(map (partial rate-work preference) %))
         works-weight (reduce combine-weights
                              (map :weight
                                   (:works work-rated)))
