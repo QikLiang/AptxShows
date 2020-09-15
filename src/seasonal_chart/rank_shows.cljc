@@ -1,8 +1,8 @@
 (ns seasonal-chart.rank-shows
   (:require [clojure.string :as str]))
 
-(defn parse-num-eps
-  [list-str]
+(defn parse-credit
+  [credit]
   (let [parse-num #(let [val #?(:clj (read-string %)
                                 :cljs (js/parseInt % 10))]
                      (if (integer? val) val 1))
@@ -19,91 +19,96 @@
                         :else
                         (into [] (range (parse-num start)
                                         (+ 1 (parse-num end)))))))
-        in-parens (re-matches #".*\((.+)\)" list-str)
+        [_ position eps-str] (re-matches #"([^(]*)(?:\((.+)\))?.*"
+                                         credit)
                    ; second contains the first capture group
-        eps-list (if (nil? in-parens) []
-                   (str/split (second in-parens) #", ?"))]
-    (apply concat (map parse-eps eps-list))))
+        eps-list (if eps-str (str/split eps-str #", ?") [])]
+    (when (not position) (println credit position eps-str))
+    [position (apply concat (map parse-eps eps-list))]))
 
-(defn bsearch
-  "binarysearch function."
-  ([x ls compare-f] (bsearch x ls 0 (dec (count ls))
-                              compare-f))
-  ([x ls low high compare-f]
-    (if (< high low) -1 ; not in collection
-    (let [middle (quot (+ low high) 2)
-         v (nth ls middle)]
-      (cond (= 0 (compare-f x v)) middle
-            (> 0 (compare-f x v)) (recur x ls low (dec middle)
-                                         compare-f)
-            (< 0 (compare-f x v)) (recur x ls (inc low)
-                                         high compare-f))))))
-
-(defn parse-position
+(defn get-role-weight
   "Given a staff credit position, parse into semantic terms,
-   returning [:position weight] where weight is 0-1"
-  [position]
-  (let [mapping [["action animation director" :animation 1]
-                 ["animation" :animation 1]
-                 ["art" :art 1]
-                 ["assistant animation" :animation 0.8]
-                 ["assistant director" :direction 0.8]
-                 ["background art" :art 1]
-                 ["cg" :cg 1]
-                 ["character", :design 1]
-                 ["chief animation" :animation 1]
-                 ["chief director" :direction 1]
-                 ["chief producer" :production 1]
-                 ["color" :art 1]
-                 ["director" :direction 1]
-                 ["editing" :direction 0.8]
-                 ["episode director" :direction 1]
-                 ["in-between" :animation 0.2]
-                 ["key animation" :animation 0.8]
-                 ["lead character" :design 1]
-                 ["main animat" :animation 1]
-                 ["monster design" :design 0.7]
-                 ["music" :music 1]
-                 ["original character" :design 1]
-                 ["original creator" :story 1]
-                 ["original story" :story 1]
-                 ["planning" :production 0.8]
-                 ["producer" :production 1]
-                 ["prop design" :design 1]
-                 ["recording" :sound 0.8]
-                 ["scenario" :script 1]
-                 ["screenplay" :script 1]
-                 ["script" :script 1]
-                 ["serial composition" :series 1]
-                 ["series composition" :series 1]
-                 ["setting" :story 0.5]
-                 ["sound" :sound 1]
-                 ["storyboard" :script 0.8]
-                 ["sub character" :design 0.6]
-                 ["supervis" :story 0.2]
-                 ["theme song" :music 1]
-                 ["unit director" :animation 0.5]]
-        ; lexigraphically compare until one string runs out
-        str-compare (fn [sa b] ; a is string, b still in list
-                      (let [sb (first b)
-                            len (apply min (map count [sa sb]))]
-                        (apply compare
-                               (map #(subs % 0 len)
-                                    [sa sb]))))
-        index (bsearch (str/lower-case position)
-                mapping str-compare)
-        eps-list (parse-num-eps position)
+   returning [:category weight] where weight is 0-1"
+  [credit]
+  (let [mapping {"2nd key animation" [:animator 0.5]
+                 "action animation director" [:anima-director 1]
+                 "animation director" [:anima-director 1]
+                 "art design" [:art 1]
+                 "art director" [:art 1]
+                 "assistant animation director" [:anima-director 0.8]
+                 "assistant director" [:direction 0.8]
+                 "background art" [:art 1]
+                 "cg director" [:cg 1]
+                 "character design" [:design 1]
+                 "chief animation director" [:anima-director 1]
+                 "chief animator" [:animator 1]
+                 "chief cg director" [:cg 1]
+                 "chief director" [:direction 1]
+                 "chief producer" [:production 1]
+                 "color design" [:art 0.8]
+                 "concept design" [:design 1]
+                 "design assistant" [:design 0.7]
+                 "design assistance" [:design 0.7]
+                 "director" [:direction 1]
+                 "director of photography" [:photography 1]
+                 "editing" [:direction 0.5]
+                 "editing assistant" [:direction 0.2]
+                 "editing assistance" [:direction 0.2]
+                 "episode director" [:direction 1]
+                 "in-between animation" [:animator 0.2]
+                 "inserted song performance" [:music 1]
+                 "key animation" [:animator 0.9]
+                 "layout" [:direction 0.8]
+                 "lead character design" [:design 1]
+                 "main animation" [:animator 1]
+                 "mechanical design" [:design 0.7]
+                 "monster design" [:design 0.7]
+                 "music" [:music 1]
+                 "music producer" [:music 0.5]
+                 "original character design" [:design 1]
+                 "original creator" [:story 1]
+                 "original story" [:story 1]
+                 "painted line animation" [:animator 1]
+                 "planning" [:production 0.8]
+                 "producer" [:production 1]
+                 "prop design" [:design 1]
+                 "recording" [:sound 0.8]
+                 "scenario" [:script 1]
+                 "screenplay" [:script 1]
+                 "script" [:script 1]
+                 "script, series composition" [:series 1]
+                 "script assistant" [:script 0.7]
+                 "serial composition" [:series 1]
+                 "series composition" [:series 1]
+                 "setting" [:story 0.5]
+                 "sound director" [:sound 1]
+                 "sound effects" [:sound 0.7]
+                 "storyboard" [:script 0.8]
+                 "sub character design" [:design 0.6]
+                 "supervis" [:story 0.2]
+                 "theme song arrangement" [:music 1]
+                 "theme song composition" [:music 1]
+                 "theme song lyrics" [:music 1]
+                 "theme song performance" [:music 1]
+                 "unit director" [:animation 0.5]
+                 "world design" [:story 0.7]}
+        [position eps-list] (parse-credit credit)
+        [category weight] (mapping (-> position
+                                       str/trim
+                                       str/lower-case)
+                                   [:none 0])
         num-eps (if (empty? eps-list) 0 (apply max eps-list))
         ; round up to the nearest multiple of 13
-        max-num-eps (+ num-eps (mod (- num-eps) 13))]
-    (cond
-      (< index 0) [position :none 0]
-      (<= num-eps 0) (nth mapping index)
-      :else (update (nth mapping index) 2
-                    * (/ (count eps-list) max-num-eps)))))
+        max-num-eps (+ num-eps (mod (- num-eps) 13))
+        proportion-worked (if (pos? num-eps)
+                            (/ (count eps-list) max-num-eps)
+                            1)]
+    (when (not category) (println position))
+    ;(when (= category :cg) (println position))
+    [category (* proportion-worked weight)]))
 
 (defn rate-role [preference role]
-  (let [[pos pos-type weight] (parse-position role)]
+  (let [[pos-type weight] (get-role-weight role)]
     {:weight (* weight (preference pos-type))
      :count 1}))
 (def combine-weights (partial merge-with +))
@@ -115,8 +120,6 @@
   (-> work
       (assoc :weight (rate-roles preference (:roles work)))
       (update-in [:weight :weight] * (:score work))))
-(defn rate-works [preference works]
-  (map (partial rate-work preference) works))
 
 (defn rate-staff-item
   [preference staff]
@@ -181,7 +184,7 @@
            #(compare %2 %1)
            items)))
 
-(defn sort-roles [roles] (sort-by (comp last parse-position)
+(defn sort-roles [roles] (sort-by (comp last get-role-weight)
                                   #(compare %2 %1) roles))
 
 ; expected-size generated from my own profile

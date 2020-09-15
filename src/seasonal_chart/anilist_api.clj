@@ -338,8 +338,14 @@
   (let [staff-works (shows-to-staff shows-seen)]
     (map (compile-list staff-works) new-season)))
 
+(defn reformat-output
+  "remove unneeded data before sending"
+  [output]
+  (dissoc output "staff"))
+
 (defn apply-user-preferences [shows user-data]
-  (map (partial attach-status (:id-by-status user-data))
+  (map (comp reformat-output
+             (partial attach-status (:id-by-status user-data)))
        (link-season-to-shows shows (:shows user-data))))
 
 (defn load-results

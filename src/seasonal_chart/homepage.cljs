@@ -15,39 +15,38 @@
   (cks/remove! :settings))
 
 (def descriptions ; map settings keys to displayed text
-  {:preference {:narative {:title "Narative"
+  {:preference {:prod     {:title "Production"
+                           :direction {:title "Director"
+                                       :default 1}
+                           :production {:title "Producer"
+                                        :default 0.2}}
+                :narative {:title "Narative"
                            :story {:title "Story"
                                    :default 1}
                            :script {:title "Script"
                                     :default 0.5}
                            :series {:title "Series Composition"
                                     :default 0.7}}
+                :animation {:title "Animation"
+                            :anima-director {:title "Animation Director"
+                                             :default 1}
+                            :animator {:title "Key Animation"
+                                       :default 0.7}}
                 :visuals  {:title "Visuals"
                            :art {:title "Art"
                                  :default 0.5}
-                           :animation {:title "Animation"
-                                       :default 1}
                            :design {:title "Character Design"
                                     :default 0.5}
+                           :photography {:title "Photography"
+                                         :default 0.3}
                            :cg {:title "CGI"
                                 :default 0.3}}
                 :audio    {:title "Audio"
                            :music {:title "Music"
                                    :default 0.5}
                            :sound {:title "Sound Directing"
-                                   :default 0.2}}
-                :prod     {:title "Production"
-                           :production {:title "Producer"
-                                        :default 0.2}
-                           :direction {:title "Director"
-                                       :default 1}}}
-   :filters {:content {:title "Content"
-                       :expand {:default false}
-                       :empty {:title "empty entries"
-                               :default true}
-                       :adult {:title "adult content"
-                               :default false}}
-             :show-in {:title "Entries in my..."
+                                   :default 0.2}}}
+   :filters {:show-in {:title "Entries in my..."
                        :expand {:default false}
                        :planning  {:title "Planning list"
                                    :default true}
@@ -58,7 +57,13 @@
                        :completed {:title "Completed list"
                                    :default false}
                        :dropped   {:title "Dropped list"
-                                   :default false}}}
+                                   :default false}}
+             :content {:title "Show entries that..."
+                       :expand {:default false}
+                       :empty {:title "have no relevant info"
+                               :default true}
+                       :adult {:title "have adult content"
+                               :default false}}}
    :remember-preference {:title "Remember my preferences"
                          :default true}
    :auto-update {:title "Auto-update (uncheck if laggy)"
@@ -211,6 +216,7 @@
      [:div.expandable-content content])]))
 
 (defn expandable-slider [[root-param sub-params]]
+  (println root-param sub-params)
   [expandable-container [setting-slider [:preference root-param]]
    [:preference root-param :expand]
    (r-map first
