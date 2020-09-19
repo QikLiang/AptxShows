@@ -7,7 +7,7 @@
             [clojure.string :as str]
             [seasonal-chart.rank-shows :as rank]))
 
-(def shows (r/atom :loading))
+(def profile (r/atom :loading))
 
 (def settings-version 1)
 (when (> settings-version (cks/get :version 0))
@@ -23,10 +23,10 @@
                 :narative {:title "Narative"
                            :story {:title "Story"
                                    :default 1}
-                           :script {:title "Script"
-                                    :default 0.5}
                            :series {:title "Series Composition"
-                                    :default 0.7}}
+                                    :default 0.7}
+                           :script {:title "Script"
+                                    :default 0.5}}
                 :animation {:title "Animation"
                             :anima-director {:title "Animation Director"
                                              :default 1}
@@ -46,18 +46,20 @@
                                    :default 0.5}
                            :sound {:title "Sound Directing"
                                    :default 0.2}}}
-   :filters {:show-in {:title "Entries in my..."
+   :filters {:show-in {:title "Show entries in my..."
                        :expand {:default false}
-                       :planning  {:title "Planning list"
+                       :planning  {:title "...Planning list"
                                    :default true}
-                       :watching  {:title "Watching list"
+                       :watching  {:title "...Watching list"
                                    :default true}
-                       :paused    {:title "On Hold list"
+                       :paused    {:title "...On Hold list"
                                    :default true}
-                       :completed {:title "Completed list"
+                       :completed {:title "...Completed list"
                                    :default false}
-                       :dropped   {:title "Dropped list"
-                                   :default false}}
+                       :dropped   {:title "...Dropped list"
+                                   :default false}
+                       :none      {:title "Not in any above"
+                                   :default true}}
              :content {:title "Show entries that..."
                        :expand {:default false}
                        :empty {:title "have no relevant info"
@@ -121,8 +123,9 @@
 (defn auto-update! []
   (when (:auto-update @settings-ui) (update-shows!)))
 
-(defn reset-state [showlist]
-  (reset! shows (reader/read-string showlist)))
+(defn reset-state [output]
+  (let [data (reader/read-string output)]
+    (reset! profile data)))
 
 (defn get-shows! []
   (let [{year :year season :season} @cur-season
@@ -136,7 +139,7 @@
       (cks/set! :settings @settings-ui)
       (cks/set! :cur-season @cur-season)
       (cks/set! :username user))
-    (reset! shows :loading)
+    (reset! profile :loading)
     (reset! show-items init-items)
     (GET url {:handler reset-state})
     (set! js/window.location.href
@@ -149,7 +152,7 @@
    reagent can call afterwards"
   ([f vs] (r-map identity f vs))
   ([keyf f vs]
-   (map (fn [v] ^{:key (keyf v)}[f v]) vs)))
+   (map (fn [v] ^{:key (if ^boolean goog.DEBUG v (keyf v))}[f v]) vs)))
 
 (defn show-season-button [{:keys [year season] :as entry}]
   [:a
@@ -216,7 +219,6 @@
      [:div.expandable-content content])]))
 
 (defn expandable-slider [[root-param sub-params]]
-  (println root-param sub-params)
   [expandable-container [setting-slider [:preference root-param]]
    [:preference root-param :expand]
    (r-map first
@@ -327,8 +329,7 @@
 
 (defn display-show-entity [show]
   (display-entity (show :image)
-                  (abreviate-title
-                    (get-in show [:title "romaji"]))
+                  (abreviate-title (get-in show [:title "romaji"]))
                   (->> (show :roles)
                        (rank/sort-roles)
                        (take 2)
@@ -346,27 +347,32 @@
                    :href (str "https://anilist.co/staff/"
                               (staff :staff-id))}))
 
-(defn display-staff-works [staff]
+(defn display-staff-works [stat-counts staff]
   [:div.list-item.staff-works
    ^{:key (select-keys staff [:staff-id :weight])}
    [display-staff-entity staff]
-   (r-map display-show-entity
-        (take 4 (rank/sort-works (staff :works))))])
+   (r-map :show-id display-show-entity
+          (take 4 (rank/sort-by-weights (:mean stat-counts)
+                                        (:per-work-count stat-counts)
+                                        true
+                                        (staff :works))))])
 
 (defn filter-show
   "Just like the convention for filter, this returns false
    if the show should be hidden."
   [filters show]
-  (and (or (:adult filters) (not (show "isAdult")))
-       (or (:empty filters) (seq (show :list)))
+  (and (or (get-in filters [:content :adult]) (not (show "isAdult")))
+       (or (get-in filters [:content :empty]) (seq (show :list)))
        (let [status-label {"PLANNING" :planning
                            "COMPLETED" :completed
                            "PAUSED" :paused
                            "CURRENT" :watching
                            "DROPPED" :dropped}]
-         (get filters (status-label (:status show)) true))))
+         (get (:show-in filters)
+              (get status-label (:status show) :none)
+              true))))
 
-(defn display-show [show]
+(defn display-show [stat-counts show]
   [:div.show-item {:key (show "id")}
    [:div.info-column
     [:img.show-img {:src
@@ -375,18 +381,34 @@
      "Anilist entry"]
     [:a {:href (str "https://myanimelist.net/anime/"
                     (show "idMal"))}
-     "MyAnimeList entry"]]
+     "MyAnimeList entry"]
+    [:p "Expected score: " (int (rank/bayesian-average
+                                  (:weight show)
+                                  (:mean stat-counts)
+                                  (:per-show-count stat-counts)))
+     "%"]
+    (if ^boolean goog.DEBUG
+        (let [{w :sum c :count} (:weight show)]
+            [:div.debug-info
+             [:p "weight:" w [:br]
+              "count:" c [:br]
+              "weight/count: " (/ w c)]])
+      nil)]
     [:div.show-info
      [:div.show-title (get-in show ["title" "romaji"])]
-     (into [:div.show-info-list]
-           (r-map :staff-name display-staff-works
-                  (take 4 (rank/sort-staff (show :list)))))]])
+     (->> (show :list)
+          (rank/sort-by-weights (:mean stat-counts)
+                                (:per-item-count stat-counts)
+                                true)
+          (take 4)
+          (r-map :staff-name (partial display-staff-works stat-counts))
+          (into [:div.show-info-list]))]])
 
 (defn scroll-end []
   (r/after-render #(.scrollTo
                      js/window 0
                      (.. js/document -body -offsetHeight)))
-  (reset! show-items (count @shows)))
+  (reset! show-items (count @profile)))
 
 (defn scroll-end-button []
   [:svg.scroll-end-button {:width 50 :height 50
@@ -396,14 +418,14 @@
 
 (defn show-list []
   (cond
-    (= @shows :loading)
+    (= @profile :loading)
     [:h1.show-item.load-message "Please wait while loading"]
 
-    (= @shows :unhandled-error)
+    (= @profile :unhandled-error)
     [:h1.show-item.load-message "Something went wrong.
                                  Please wait for it to be fixed."]
 
-    (= @shows :user-not-found)
+    (= @profile :user-not-found)
     [:div.show-item.error-message
      [:h1 "Username not found."]
      [:hr]
@@ -428,18 +450,22 @@
        "See here for instructions."]]]
 
     :else
-    (into [:div.show-list (scroll-end-button)]
-          (->> @shows
-               (map (partial rank/apply-preference
-                             (->> @settings
-                                  :preference
-                                  vals
-                                  (apply merge))))
-               (rank/sort-shows)
-               (filter (partial filter-show (:filters @settings)))
-               (take @show-items)
-               (r-map #(select-keys % ["id" :weight])
-                      display-show)))))
+    (let [preference (->> @settings
+                          :preference
+                          vals
+                          (apply merge))
+          shows-rated (map (partial rank/apply-preference preference)
+                           @profile)
+          stat-counts (rank/compute-average-counts shows-rated)]
+      (into [:div.show-list (scroll-end-button)]
+            (->> shows-rated
+                 (rank/sort-by-weights (:mean stat-counts)
+                                       (:per-show-count stat-counts)
+                                       true)
+                 (filter (partial filter-show (:filters @settings)))
+                 (take @show-items)
+                 (r-map #(% "id")
+                        (partial display-show stat-counts)))))))
 
 (r/render [show-header]
           (.getElementById js/document "header"))
@@ -449,8 +475,8 @@
 
 (defn check-scroll []
   (when (and
-           (seq? @shows)
-           (< @show-items (count @shows))
+           (seq? @profile)
+           (< @show-items (count @profile))
            (> (+ (.-scrollY js/window) (.-innerHeight js/window))
               (- (.. js/document -body -offsetHeight) 3000)))
     (swap! show-items + init-items)))

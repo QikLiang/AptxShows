@@ -23,7 +23,6 @@
                                          credit)
                    ; second contains the first capture group
         eps-list (if eps-str (str/split eps-str #", ?") [])]
-    (when (not position) (println credit position eps-str))
     [position (apply concat (map parse-eps eps-list))]))
 
 (defn get-role-weight
@@ -32,7 +31,9 @@
   [credit]
   (let [mapping {"2nd key animation" [:animator 0.5]
                  "action animation director" [:anima-director 1]
+                 "animation character design" [:design 0.8]
                  "animation director" [:anima-director 1]
+                 "animation supervisor" [:anima-director 0.8]
                  "art design" [:art 1]
                  "art director" [:art 1]
                  "assistant animation director" [:anima-director 0.8]
@@ -45,7 +46,9 @@
                  "chief cg director" [:cg 1]
                  "chief director" [:direction 1]
                  "chief producer" [:production 1]
+                 "cinematography" [:direction 0.6]
                  "color design" [:art 0.8]
+                 "colour design" [:art 0.8]
                  "concept design" [:design 1]
                  "design assistant" [:design 0.7]
                  "design assistance" [:design 0.7]
@@ -54,13 +57,17 @@
                  "editing" [:direction 0.5]
                  "editing assistant" [:direction 0.2]
                  "editing assistance" [:direction 0.2]
+                 "effects animation director" [:anima-director 0.8]
+                 "effects supervisor" [:anima-director 0.8]
                  "episode director" [:direction 1]
                  "in-between animation" [:animator 0.2]
+                 "insert song performance" [:music 1]
                  "inserted song performance" [:music 1]
                  "key animation" [:animator 0.9]
                  "layout" [:direction 0.8]
                  "lead character design" [:design 1]
                  "main animation" [:animator 1]
+                 "main animator" [:animator 1]
                  "mechanical design" [:design 0.7]
                  "monster design" [:design 0.7]
                  "music" [:music 1]
@@ -68,6 +75,7 @@
                  "original character design" [:design 1]
                  "original creator" [:story 1]
                  "original story" [:story 1]
+                 "paint" [:art 0.8]
                  "painted line animation" [:animator 1]
                  "planning" [:production 0.8]
                  "producer" [:production 1]
@@ -83,9 +91,11 @@
                  "setting" [:story 0.5]
                  "sound director" [:sound 1]
                  "sound effects" [:sound 0.7]
+                 "sound supervisor" [:sound 0.8]
                  "storyboard" [:script 0.8]
                  "sub character design" [:design 0.6]
-                 "supervis" [:story 0.2]
+                 "sub-character design" [:design 0.6]
+                 "supervisor" [:story 0.2]
                  "theme song arrangement" [:music 1]
                  "theme song composition" [:music 1]
                  "theme song lyrics" [:music 1]
@@ -103,36 +113,39 @@
         proportion-worked (if (pos? num-eps)
                             (/ (count eps-list) max-num-eps)
                             1)]
-    (when (not category) (println position))
-    ;(when (= category :cg) (println position))
+    ;(when (= :none category) (println position))
     [category (* proportion-worked weight)]))
 
 (defn rate-role [preference role]
   (let [[pos-type weight] (get-role-weight role)]
-    {:weight (* weight (preference pos-type))
-     :count 1}))
-(def combine-weights (partial merge-with +))
+    (* weight (preference pos-type))))
 (defn rate-roles [preference roles]
-  (reduce combine-weights
-          (map (partial rate-role preference) roles)))
+  (reduce + (map (partial rate-role preference) roles)))
 
-(defn rate-work [preference work]
-  (-> work
-      (assoc :weight (rate-roles preference (:roles work)))
-      (update-in [:weight :weight] * (:score work))))
+(defn rate-work
+  [preference work]
+  (let [contribution (rate-roles preference (:roles work))
+        weight (if (zero? (:score work))
+                 ; give no weight to unscored work
+                 {:sum 0, :count 0}
+                 {:sum (* contribution (:score work))
+                  :count contribution}) ]
+    (assoc work :weight weight)))
+
+(def combine-weights (partial merge-with +))
 
 (defn rate-staff-item
   [preference staff]
-  (let [work-rated (update staff :works
+  (let [past-works (update staff :works
                            #(map (partial rate-work preference) %))
-        works-weight (reduce combine-weights
-                             (map :weight
-                                  (:works work-rated)))
-        cur-roles-weight (rate-roles preference
-                                     (:roles staff))]
-    (assoc work-rated :weight
-           (update works-weight :weight *
-                   (:weight cur-roles-weight)))))
+
+        {past-works-sum :sum past-works-count :count}
+        (reduce combine-weights (map :weight (:works past-works)))
+
+        cur-roles-weight (rate-roles preference (:roles staff))]
+    (assoc past-works :weight
+           {:sum (* cur-roles-weight past-works-sum)
+            :count (* cur-roles-weight past-works-count)})))
 
 (defn rank-item
   "update the score in a single :list entry of a show"
@@ -146,10 +159,30 @@
   "given a preference object, create a function that will
    judge a show (alter its score) based on the preference"
   [preference show]
-  (as-> show s
-      (update s :list #(map (partial rank-item preference) %))
-      (assoc s :weight (reduce combine-weights
-                               (map :weight (:list s))))))
+  (let [ranked-list (map (partial rank-item preference) (:list show))
+        weight (if (empty? ranked-list)
+                 {:sum 0 :count 0}
+                 (reduce combine-weights (map :weight ranked-list)))]
+    (assoc show
+           :list ranked-list
+           :weight weight)))
+
+(defn compute-average-counts
+  "Compute average counts needed by bayesian-average"
+  [shows]
+  (let [mean (fn [data] (if (empty? data) 0 (/ (reduce + data)
+                                               (count data))))
+        get-counts (partial map (comp :count :weight))
+        show-weights (filter (comp pos? :count) (map :weight shows))
+        shows-mean (mean (map (fn [{c :count w :sum}] (/ w c))
+                              (filter (comp pos? :count) show-weights)))
+        items-count (mean (map :count show-weights))
+        items (mapcat :list shows)
+        works-count (mean (get-counts items))
+        works (mapcat :works items)
+        attr-count (mean (get-counts works))]
+    {:mean shows-mean :per-show-count items-count
+     :per-item-count works-count :per-work-count attr-count}))
 
 (defn bayesian-average
   "See e.g. https://fulmicoton.com/posts/bayesian_rating/
@@ -169,20 +202,20 @@
    sense to penaltize shows with a staff list you know
    nothing about (or empty). This is done by assigning a
    negative expected mean."
-  [{w :weight c :count} expected-mean expected-size]
-  (/ (+ (* w c) (* expected-mean expected-size))
-     (+ c expected-size)))
+  [{sum :sum actual-count :count} expected-mean expected-size]
+  (/ (+ sum (* expected-mean expected-size))
+     (+ actual-count expected-size)))
 
-(defn sort-by-weights [items expected-mean expected-size
-                       by-significance]
+(defn sort-by-weights [expected-mean expected-size
+                       by-significance items]
   (let [bay-avg #(bayesian-average (:weight %)
                                    expected-mean
                                    expected-size)]
-  (sort-by (if by-significance
-             (comp #(Math/abs %) float bay-avg)
-             bay-avg)
-           #(compare %2 %1)
-           items)))
+    (sort-by (if by-significance
+               (comp #(Math/abs %) float bay-avg)
+               bay-avg)
+             #(compare %2 %1)
+             items)))
 
 (defn sort-roles [roles] (sort-by (comp last get-role-weight)
                                   #(compare %2 %1) roles))
@@ -191,6 +224,5 @@
 ; show a staff's most prominant works instead of highest
 ; rated works because users want to know if someone made
 ; shows they've dropped as much as if they made great shows
-(defn sort-works [works] (sort-by-weights works 0 2 true))
-(defn sort-staff [staff] (sort-by-weights staff 0 8 true))
-(defn sort-shows [shows] (sort-by-weights shows -0.29 40 false))
+(defn sort-works [works] (sort-by-weights 0 2 true works))
+(defn sort-staff [staff] (sort-by-weights 0 8 true staff))

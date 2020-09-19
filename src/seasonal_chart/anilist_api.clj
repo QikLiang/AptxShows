@@ -179,8 +179,9 @@
   (/ (- score (stats "meanScore"))
      (stats "standardDeviation")))
 
-(defn make-user-query [user]
+(defn make-user-query
   "Make call to Anilist API to fetch user data."
+  [user]
   (let [q "MediaListCollection(userName: $user type: ANIME){
             lists {
               status
@@ -254,8 +255,8 @@
   (let [show-info {:title   (show "title")
                    :show-id (show "id")
                    :score   (show :score)
-                   :image   (get-in show ["coverImage"
-                                          "medium"])}
+                   :image   (get-in show ["coverImage" "medium"])
+                   :status  (show :status)}
         format-roles (fn [roles]
                        (assoc show-info :roles
                               (map #(% "role") roles)))]
@@ -343,10 +344,11 @@
   [output]
   (dissoc output "staff"))
 
-(defn apply-user-preferences [shows user-data]
-  (map (comp reformat-output
-             (partial attach-status (:id-by-status user-data)))
-       (link-season-to-shows shows (:shows user-data))))
+(defn synthesize-user-profile [season user-data]
+  (let [add-status (partial attach-status (:id-by-status user-data))]
+    (map (comp reformat-output add-status)
+         (link-season-to-shows season
+                               (map add-status (:shows user-data))))))
 
 (defn load-results
   ([year season] (link-season-to-shows
@@ -357,6 +359,6 @@
   ([year season user cache-lookup]
    (let [user-data (cache-lookup get-user-data user)]
      (or (:error user-data)
-         (apply-user-preferences
+         (synthesize-user-profile
            (load-season year season)
            user-data)))))

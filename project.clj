@@ -24,7 +24,8 @@
   :ring {:handler seasonal-chart.handler/app}
   :cljsbuild { :builds [{:source-paths ["src"]
                          :compiler {:output-to "target/public/cljs-out/homepage.js"
-                                    :optimizations :advanced}}]}
+                                    :optimizations :advanced
+                                    :closure-defines {goog.DEBUG false}}}]}
   :profiles
   {:dev {:dependencies [[javax.servlet/servlet-api "2.5"]
                         [ring/ring-mock "0.3.2"]
