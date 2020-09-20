@@ -70,6 +70,21 @@
                                         :default true}
                         :not-seen-spinoffs {:title "Spin-off of not watched"
                                             :default true}}
+             :format  {:title "Filter by format"
+                       :tv      {:title "TV series"
+                                 :default true}
+                       :short   {:title "TV shorts"
+                                 :default true}
+                       :movie   {:title "Movies"
+                                 :default true}
+                       :special {:title "Specials"
+                                 :default true}
+                       :ova     {:title "OVA"
+                                 :default true}
+                       :ona     {:title "ONA"
+                                 :default true}
+                       :music   {:title "Music videos"
+                                 :default true}}
              :content {:title "Show entries that..."
                        :expand {:default false}
                        :empty {:title "have no relevant info"
@@ -391,6 +406,7 @@
                 [:not-seen-sequels false :sequels]
                 [:seen-spinoffs true :spin-offs]
                 [:not-seen-spinoffs false :spin-offs]])
+           (get (:format filters) (show :format) true)
            (get (:show-in filters)
                 (get status-label (:status show) :none)
                 true))))
@@ -405,6 +421,8 @@
     [:a {:href (str "https://myanimelist.net/anime/"
                     (show "idMal"))}
      "MyAnimeList entry"]
+    [:p "Format: " (get-in descriptions [:filters :format
+                                         (show :format) :title])]
     [:p "Expected score: " (int (rank/bayesian-average
                                   (:weight show)
                                   (:mean stat-counts)

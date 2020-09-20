@@ -365,7 +365,15 @@
 (defn reformat-output
   "remove unneeded data before sending"
   [output]
-  (dissoc output "staff"))
+  (assoc
+    (dissoc output "staff" "format")
+    :format ({"TV" :tv
+              "TV_SHORT" :short
+              "MOVIE" :movie
+              "SPECIAL" :special
+              "OVA" :ova
+              "ONA" :ona
+              "MUSIC" :music} (output "format"))))
 
 (defn synthesize-user-profile [season user-data]
   (let [status->ids (:id-by-status user-data)
