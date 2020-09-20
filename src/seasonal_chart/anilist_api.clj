@@ -3,11 +3,12 @@
             [clojure.core.async :as a]
             [clojure.string :as str]))
 
-(defn update-map
-  "update every value in map m with function f"
-  [m f]
-  (reduce-kv (fn [m k v]
-    (assoc m k (f v))) {} m))
+(defn group-by-xf
+  "apply a transform onto the values of a map after group-by"
+  [f xf coll]
+  (reduce-kv (fn [m k v] (assoc m k (xf v)))
+             {}
+             (group-by f coll)))
 
 (defn parsevar
   "Format parameter variables for GraphQL query.
@@ -85,16 +86,16 @@
   [show]
   (-> show
       (assoc "staff"
-             (update-map
-               (group-by #(get-in % ["node" "id"])
-                         (get-in show ["staff" "edges"]))
+             (group-by-xf
+               #(get-in % ["node" "id"])
                (fn [staffs]
                  {:roles (map #(% "role") staffs)
                   :staff-name (get-in (first staffs) ["node"
                                                       "name"])
                   :staff-img (get-in (first staffs) ["node"
                                                      "image"
-                                                     "medium"])})))))
+                                                     "medium"])})
+               (get-in show ["staff" "edges"])))))
 
 (defn get-season
   "Return all airing shows for a season."
@@ -113,8 +114,10 @@
             }
             format
             relations{
-              nodes{id}
-              edges{relationType}
+              edges{
+                relationType
+                node{id}
+              }
             }
             staff {
               edges {
@@ -236,13 +239,13 @@
         shows (->> media-lists
                    (mapcat extract-entries)
                    (filter #(not= 0 (% "score"))))
-        id-by-status (into {}
-                           (for [[k v] (group-by
-                                         #(% "status") media-lists)]
-                             [k (->> v
-                                     (mapcat #(% "entries"))
-                                     (map #(get-in % ["media" "id"]))
-                                     (set))]))
+        id-by-status (group-by-xf #(% "status")
+                                  (partial
+                                    into #{}
+                                    (comp
+                                      (mapcat #(% "entries"))
+                                      (map #(get-in % ["media" "id"]))))
+                                  media-lists)
         stats (get-in data ["User" "statistics" "anime"])]
     (if (:error data)
       data
@@ -260,10 +263,9 @@
         format-roles (fn [roles]
                        (assoc show-info :roles
                               (map #(% "role") roles)))]
-    (update-map
-      (group-by #(get-in % ["node" "id"])
-                (get-in show ["staff" "edges"]))
-      format-roles)))
+    (group-by-xf #(get-in % ["node" "id"])
+                 format-roles
+                 (get-in show ["staff" "edges"]))))
 
 (defn merge-into-list [maps]
   (reduce (fn [m [k v]]
@@ -335,6 +337,27 @@
   (load-obj
     (str "data/" user ".edn")))
 
+(defn process-relations
+  "processes a show's 'relations' into the form {:relation [id]}
+   and store it in :relations"
+  [id-by-status show]
+  (let [labels-map {"PREQUEL" :sequels
+                    "SEQUEL" :sequels
+                    "PARENT" :spin-offs
+                    "SIDE_STORY" :spin-offs
+                    "SPIN_OFF" :spin-offs
+                    "CHARACTER" :spin-offs}
+        relation->status #(key-containing id-by-status
+                                          (get-in % ["node" "id"]))]
+    (->> (get-in show ["relations" "edges"])
+         (group-by-xf #(labels-map (get-in % ["relationType"]))
+                      #(into [] (comp
+                                  (map relation->status)
+                                  (distinct))
+                             %))
+         (assoc show :relations)
+         (#(dissoc % "relations")))))
+
 (defn link-season-to-shows [new-season shows-seen]
   (let [staff-works (shows-to-staff shows-seen)]
     (map (compile-list staff-works) new-season)))
@@ -345,10 +368,12 @@
   (dissoc output "staff"))
 
 (defn synthesize-user-profile [season user-data]
-  (let [add-status (partial attach-status (:id-by-status user-data))]
-    (map (comp reformat-output add-status)
-         (link-season-to-shows season
-                               (map add-status (:shows user-data))))))
+  (let [status->ids (:id-by-status user-data)
+        add-status (partial attach-status status->ids)
+        add-relations (partial process-relations status->ids)]
+    (mapv (comp reformat-output add-relations add-status)
+          (link-season-to-shows season
+                                (map add-status (:shows user-data))))))
 
 (defn load-results
   ([year season] (link-season-to-shows

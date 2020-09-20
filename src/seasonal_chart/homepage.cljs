@@ -60,6 +60,16 @@
                                    :default false}
                        :none      {:title "Not in any above"
                                    :default true}}
+             :relation {:title "Show sequels & spin-offs"
+                        :expand {:default false}
+                        :seen-sequels {:title "Sequel of watched"
+                                       :default true}
+                        :not-seen-sequels {:title "Sequel of not watched"
+                                           :default true}
+                        :seen-spinoffs {:title "Spin-off of watched"
+                                        :default true}
+                        :not-seen-spinoffs {:title "Spin-off of not watched"
+                                            :default true}}
              :content {:title "Show entries that..."
                        :expand {:default false}
                        :empty {:title "have no relevant info"
@@ -152,7 +162,10 @@
    reagent can call afterwards"
   ([f vs] (r-map identity f vs))
   ([keyf f vs]
-   (map (fn [v] ^{:key (if ^boolean goog.DEBUG v (keyf v))}[f v]) vs)))
+   (map (fn [v]
+            ^{:key ((if ^boolean goog.DEBUG prn-str keyf) v)}
+            [f v])
+        vs)))
 
 (defn show-season-button [{:keys [year season] :as entry}]
   [:a
@@ -361,16 +374,26 @@
   "Just like the convention for filter, this returns false
    if the show should be hidden."
   [filters show]
-  (and (or (get-in filters [:content :adult]) (not (show "isAdult")))
-       (or (get-in filters [:content :empty]) (seq (show :list)))
-       (let [status-label {"PLANNING" :planning
-                           "COMPLETED" :completed
-                           "PAUSED" :paused
-                           "CURRENT" :watching
-                           "DROPPED" :dropped}]
-         (get (:show-in filters)
-              (get status-label (:status show) :none)
-              true))))
+  (let [status-label {"PLANNING" :planning
+                      "COMPLETED" :completed
+                      "PAUSED" :paused
+                      "CURRENT" :watching
+                      "DROPPED" :dropped}
+        seen-status #(and (some? %) (not= % "PLANNING"))]
+      (and (or (get-in filters [:content :adult]) (not (show "isAdult")))
+           (or (get-in filters [:content :empty]) (seq (show :list)))
+           (every?
+               (fn [[setting seen? relation]]
+                   (or (get-in filters [:relation setting])
+                       (not-any? (comp #(= % seen?) seen-status)
+                                 (get-in show [:relations relation]))))
+               [[:seen-sequels true :sequels]
+                [:not-seen-sequels false :sequels]
+                [:seen-spinoffs true :spin-offs]
+                [:not-seen-spinoffs false :spin-offs]])
+           (get (:show-in filters)
+                (get status-label (:status show) :none)
+                true))))
 
 (defn display-show [stat-counts show]
   [:div.show-item {:key (show "id")}
@@ -475,7 +498,7 @@
 
 (defn check-scroll []
   (when (and
-           (seq? @profile)
+           (sequential? @profile)
            (< @show-items (count @profile))
            (> (+ (.-scrollY js/window) (.-innerHeight js/window))
               (- (.. js/document -body -offsetHeight) 3000)))
