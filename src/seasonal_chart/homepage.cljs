@@ -140,7 +140,6 @@
 (def show-items (r/atom init-items))
 
 (defn update-shows! []
-  (js/console.log (str (:preference @settings)))
   (reset! settings @settings-ui)
   (when (:remember-preference @settings)
     (cks/set! :settings @settings)))
@@ -203,7 +202,8 @@
       (into {} (for [[k v] category]
                  [k (if (number? v) (* mult v) v)])))))
 
-(defn setting-slider [path]
+(defn setting-slider
+  [path]
   [:div.setting-slider
    (let [slider-range 100
          category (get-in @settings-ui path)
@@ -213,20 +213,21 @@
                                 (dissoc :expand)
                                 (vals)))
                  category)]
-     [:input {:type "range" :min 0 :max slider-range
-              :value (* slider-range value)
-              :on-change (fn [e]
-                           (.-target e)
-                           (let [input (.. e -target -value)
-                                 new-val (/ input slider-range)]
-                             (if header?
-                               (swap! settings-ui update-in
-                                      path
-                                      update-category value new-val)
-                               (swap! settings-ui assoc-in
-                                      path new-val)))
-                           (auto-update!))
-              }])
+     [:div.slider-wrapper ;put in wrapper so hover blocks parent
+      {:on-click (fn [e] (. e stopPropagation))}
+      [:input {:type "range" :min 0 :max slider-range
+               :value (* slider-range value)
+               :on-change (fn [e]
+                            (.-target e)
+                            (let [input (.. e -target -value)
+                                  new-val (/ input slider-range)]
+                              (if header?
+                                (swap! settings-ui update-in
+                                       path
+                                       update-category value new-val)
+                                (swap! settings-ui assoc-in
+                                       path new-val)))
+                            (auto-update!))}]])
    ; put slider before description to use CSS adjacent sibling
    ; selector, use flex-direction to fix presentation order
    [:div.slider-desc (get-desc path)]])
@@ -235,11 +236,11 @@
   (let [expanded (get-in @settings-ui expand-setting)]
   [:div.expandable
    [:div.expandable-header
+    {:on-click (fn [_]
+                   (swap! settings-ui update-in expand-setting not)
+                   (auto-update!))}
     [:svg.expand-button
-     {:width 30 :height 30
-      :on-click (fn [_]
-                  (swap! settings-ui update-in expand-setting not)
-                  (auto-update!))}
+     {:width 30 :height 30}
      [:line {:x1 5 :y1 15 :x2 25 :y2 15}]
      (if (not expanded) [:line {:x1 15 :y1 5 :x2 15 :y2 25}])]
     header]

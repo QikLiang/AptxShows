@@ -121,16 +121,20 @@ hr {
 	display: flex;
 	flex-direction: row;
 	align-items: center;
+	cursor: pointer;
+}
+
+.expandable-header .slider-wrapper:hover {
+	cursor: normal;
 }
 
 .expand-button {
 	margin: 5px;
 	stroke: black;
 	stroke-width: 5px;
-	cursor: pointer;
 }
 
-.expand-button:hover {
+.expandable-header:hover .expand-button {
 	background-color: white;
 	border-radius: 5px;
 }
