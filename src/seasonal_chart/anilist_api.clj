@@ -112,6 +112,10 @@
               medium
               large
             }
+            trailer {
+              site
+              id
+            }
             format
             relations{
               edges{

@@ -9,9 +9,11 @@
 
 (def profile (r/atom :loading))
 
+(defn set-cookie! [k v] (cks/set! k v {:domain nil}))
+
 (def settings-version 1)
 (when (> settings-version (cks/get :version 0))
-  (cks/set! :version settings-version)
+  (set-cookie! :version settings-version)
   (cks/remove! :settings))
 
 (def descriptions ; map settings keys to displayed text
@@ -142,7 +144,7 @@
 (defn update-shows! []
   (reset! settings @settings-ui)
   (when (:remember-preference @settings)
-    (cks/set! :settings @settings)))
+    (set-cookie! :settings @settings)))
 
 (defn auto-update! []
   (when (:auto-update @settings-ui) (update-shows!)))
@@ -160,9 +162,9 @@
         url (str/join "/" ["/api/getshows"
                            (str year) season user])]
     (when (:remember-preference @settings-ui)
-      (cks/set! :settings @settings-ui)
-      (cks/set! :cur-season @cur-season)
-      (cks/set! :username user))
+      (set-cookie! :settings @settings-ui)
+      (set-cookie! :cur-season @cur-season)
+      (set-cookie! :username user))
     (reset! profile :loading)
     (reset! show-items init-items)
     (GET url {:handler reset-state})
@@ -342,7 +344,7 @@
   [entity]
   (str/join
     ", "
-    (filter some? [(entity "last") (entity "first")])))
+    (filter seq [(entity "last") (entity "first")])))
 
 (defn display-entity
   "Create a display with an image, name, and description"
@@ -414,37 +416,45 @@
 
 (defn display-show [stat-counts show]
   [:div.show-item {:key (show "id")}
-   [:div.info-column
-    [:img.show-img {:src
-                    (get-in show ["coverImage" "large"])}]
-    [:a {:href (str "https://anilist.co/anime/" (show "id"))}
-     "Anilist entry"]
-    [:a {:href (str "https://myanimelist.net/anime/"
-                    (show "idMal"))}
-     "MyAnimeList entry"]
-    [:p "Format: " (get-in descriptions [:filters :format
-                                         (show :format) :title])]
-    [:p "Expected score: " (int (rank/bayesian-average
-                                  (:weight show)
-                                  (:mean stat-counts)
-                                  (:per-show-count stat-counts)))
-     "%"]
-    (if ^boolean goog.DEBUG
-        (let [{w :sum c :count} (:weight show)]
-            [:div.debug-info
-             [:p "weight:" w [:br]
-              "count:" c [:br]
-              "weight/count: " (/ w c)]])
-      nil)]
-    [:div.show-info
+   [:div.show-content
+    [:img.show-img {:src (get-in show ["coverImage" "large"])}]
+    [:div.info-column
      [:div.show-title (get-in show ["title" "romaji"])]
-     (->> (show :list)
-          (rank/sort-by-weights (:mean stat-counts)
-                                (:per-item-count stat-counts)
-                                true)
-          (take 4)
-          (r-map :staff-name (partial display-staff-works stat-counts))
-          (into [:div.show-info-list]))]])
+     [:div.show-info-wrapper
+      [:div.video-wrapper
+       (if (= "youtube" (get-in show ["trailer" "site"]))
+         [:iframe {:src (str "https://www.youtube.com/embed/"
+                             (get-in show ["trailer" "id"]))
+                   :allowfullscreen "allowfullscreen"}])]
+      [:div.show-info
+       [:a {:href (str "https://anilist.co/anime/" (show "id"))}
+        "Anilist entry"]
+       [:br]
+       [:a {:href (str "https://myanimelist.net/anime/" (show "idMal"))}
+        "MyAnimeList entry"]
+       [:br]
+       "Format: " (get-in descriptions [:filters :format
+                                        (show :format) :title])
+       [:br]
+       "Expected score: " (int (rank/bayesian-average
+                                 (:weight show)
+                                 (:mean stat-counts)
+                                 (:per-show-count stat-counts)))
+       "%"
+       [:br]
+       (if false;^boolean goog.DEBUG
+         (let [{w :sum c :count} (:weight show)]
+           [:div.debug-info
+            [:p "weight:" w [:br]
+             "count:" c [:br]
+             "weight/count: " (/ w c)]]))]]]]
+   (->> (show :list)
+        (rank/sort-by-weights (:mean stat-counts)
+                              (:per-item-count stat-counts)
+                              true)
+        (take 4)
+        (r-map :staff-name (partial display-staff-works stat-counts))
+        (into [:div.show-info-list]))])
 
 (defn scroll-end []
   (r/after-render #(.scrollTo
