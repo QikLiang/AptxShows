@@ -3,6 +3,7 @@
             [reagent.cookies :as cks]
             [ajax.core :refer [GET]]
             [clojure.walk :refer [postwalk]]
+            [cljs.core.async :as async]
             [cljs.reader :as reader]
             [clojure.string :as str]
             [seasonal-chart.rank-shows :as rank]))
@@ -93,10 +94,14 @@
                                :default true}
                        :adult {:title "have adult content"
                                :default false}}}
+   :view-size {:items 4 :works 3}
    :remember-preference {:title "Remember my preferences"
                          :default true}
    :auto-update {:title "Auto-update (uncheck if laggy)"
                  :default true}})
+
+(def update-view-size (async/chan))
+(def on-view-size-event (async/mult update-view-size))
 
 (defn get-defaults [descriptions]
   (postwalk (fn [obj] (cond
@@ -311,7 +316,25 @@
     [:button#update-button.button {:on-click update-shows!}
      "Apply Preferences"]
     (setting-checkbox [:remember-preference])
-    (setting-checkbox [:auto-update])]])
+    (setting-checkbox [:auto-update])]
+   (into [:div.view-size-selectors]
+         (for [[label item-count work-count icon-row-len]
+               [["Compact" 3 1 3]
+                ["Normal" 4 3 2]
+                ["detailed" 10 5 1]]]
+           [:div.view-size-selector
+            {:on-click #(do
+                          (swap! settings assoc :view-size
+                                 {:items item-count :works work-count})
+                          (async/put! update-view-size item-count))}
+            (into [:svg {:width 30 :height 30}]
+                  (for [row (range 3)
+                        col (range icon-row-len)]
+                    [:rect {:x (* col (/ 30 icon-row-len))
+                            :y (* row 10)
+                            :width (- (/ 30 icon-row-len) 3)
+                            :height 7}]))
+            label]))])
 
 (defn abreviate-title
   "insert ellipses smartly in long show titles"
@@ -379,14 +402,28 @@
                               (staff :staff-id))}))
 
 (defn display-staff-works [stat-counts staff]
-  [:div.list-item.staff-works
-   ^{:key (select-keys staff [:staff-id :weight])}
-   [display-staff-entity staff]
-   (r-map :show-id display-show-entity
-          (take 4 (rank/sort-by-weights (:mean stat-counts)
-                                        (:per-work-count stat-counts)
-                                        true
-                                        (staff :works))))])
+  (let [works (rank/sort-by-weights (:mean stat-counts)
+                                    (:per-work-count stat-counts)
+                                    true
+                                    (staff :works))
+        default-count (get-in @settings [:view-size :works])
+        shown-count (r/atom default-count)
+        left-arrow \u276E
+        right-arrow \u276F]
+    (fn []
+      (conj
+        (into [:div.list-item.staff-works [display-staff-entity staff]]
+              (r-map :show-id display-show-entity
+                     (take @shown-count works)))
+        (cond
+          (> (count works) @shown-count)
+          [:div.show-more-arrow
+           {:on-click #(reset! shown-count (count works))}
+           [:span right-arrow]]
+          (< default-count @shown-count)
+          [:div.show-more-arrow
+           {:on-click #(reset! shown-count default-count)}
+           [:span left-arrow]])))))
 
 (defn filter-show
   "Just like the convention for filter, this returns false
@@ -448,13 +485,35 @@
             [:p "weight:" w [:br]
              "count:" c [:br]
              "weight/count: " (/ w c)]]))]]]]
-   (->> (show :list)
-        (rank/sort-by-weights (:mean stat-counts)
-                              (:per-item-count stat-counts)
-                              true)
-        (take 4)
-        (r-map :staff-name (partial display-staff-works stat-counts))
-        (into [:div.show-info-list]))])
+   [(let [items (->> (show :list)
+                     (rank/sort-by-weights (:mean stat-counts)
+                                           (:per-item-count stat-counts)
+                                           true))
+          default-count (get-in @settings [:view-size :items])
+          shown-count (r/atom default-count)
+          count-change-event (async/chan)]
+      (async/tap on-view-size-event count-change-event)
+      (async/go
+        (while true
+          (reset! shown-count (async/<! count-change-event))))
+      (fn []
+        [:div.show-items-container
+         (into [:div.show-items-list]
+               (r-map :staff-name #(display-staff-works stat-counts %)
+                      (take @shown-count items)))
+         (cond
+           (> (count items) @shown-count)
+           [:div.show-more-container
+            [:div.show-more-items
+             {:on-click #(swap! shown-count + 5)}
+             "show more"]
+            [:div.show-more-items
+             {:on-click #(reset! shown-count (count items))}
+             "show all"]]
+           (> @shown-count default-count)
+           [:div.show-more-items
+             {:on-click #(reset! shown-count default-count)}
+             "show less"])]))]])
 
 (defn scroll-end []
   (r/after-render #(.scrollTo
