@@ -460,9 +460,9 @@
      [:div.show-info-wrapper
       [:div.video-wrapper
        (if (= "youtube" (get-in show ["trailer" "site"]))
-         [:iframe {:src (str "https://www.youtube.com/embed/"
+         [:iframe {:src (str "https://www.youtube-nocookie.com/embed/"
                              (get-in show ["trailer" "id"]))
-                   :allowfullscreen "allowfullscreen"}])]
+                   :allowFullScreen "allowFullScreen"}])]
       [:div.show-info
        [:a {:href (str "https://anilist.co/anime/" (show "id"))}
         "Anilist entry"]
