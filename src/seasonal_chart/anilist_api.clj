@@ -366,18 +366,31 @@
   (let [staff-works (shows-to-staff shows-seen)]
     (map (compile-list staff-works) new-season)))
 
+(defn remove-self
+  "Remove a show from its own staffs' credits list because it's
+   redunant information and biases predictive score"
+  [show]
+  (let [filter-works (partial filterv #(not= (:show-id %) (show "id")))
+        update-list (map #(update % :works filter-works))
+        ; remove items that are empty after being updated
+        filter-empty (filter (comp not empty? :works))]
+    (update show :list (partial into []
+                                ; note transducers update in reverse
+                                (comp update-list filter-empty)))))
+
 (defn reformat-output
   "remove unneeded data before sending"
   [output]
-  (assoc
-    (dissoc output "staff" "format")
-    :format ({"TV" :tv
-              "TV_SHORT" :short
-              "MOVIE" :movie
-              "SPECIAL" :special
-              "OVA" :ova
-              "ONA" :ona
-              "MUSIC" :music} (output "format"))))
+  (-> output
+      (dissoc "staff" "format")
+      (assoc :format ({"TV" :tv
+                       "TV_SHORT" :short
+                       "MOVIE" :movie
+                       "SPECIAL" :special
+                       "OVA" :ova
+                       "ONA" :ona
+                       "MUSIC" :music} (output "format")))
+      remove-self))
 
 (defn synthesize-user-profile [season user-data]
   (let [status->ids (:id-by-status user-data)
