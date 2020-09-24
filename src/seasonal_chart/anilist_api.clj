@@ -141,7 +141,7 @@
           }"
         vars {:page-type "media"
               :Int.year year
-              :MediaSeason.season season}]
+              :MediaSeason.season (str/upper-case season)}]
     (map format-season-show (get-all-pages q vars))))
 
 (defn get-popular
@@ -341,6 +341,11 @@
   (load-obj
     (str "data/" user ".edn")))
 
+(defn save-popular []
+  (save-obj (get-popular) "data/most_popular.edn"))
+(defn load-popular []
+  (load-obj "data/most_popular.edn"))
+
 (defn process-relations
   "processes a show's 'relations' into the form {:relation [id]}
    and store it in :relations"
@@ -403,7 +408,7 @@
 (defn load-results
   ([year season] (link-season-to-shows
                    (load-season year season)
-                   (load-obj "data/most_popular.edn")))
+                   (load-popular)))
   ([year season user] (load-results year season user
                                     (fn [f v] (f v))))
   ([year season user cache-lookup]

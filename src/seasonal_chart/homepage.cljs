@@ -6,7 +6,9 @@
             [cljs.core.async :as async]
             [cljs.reader :as reader]
             [clojure.string :as str]
-            [seasonal-chart.rank-shows :as rank]))
+            [seasonal-chart.rank-shows :as rank]
+            [seasonal-chart.time-utils :as time]
+            ))
 
 (def profile (r/atom :loading))
 
@@ -126,14 +128,16 @@
                 (map #(update % 0 keyword) $)
                 (into {} $)))
 
-(def seasons-list [{:year "2019" :season "summer"}
-                   {:year "2019" :season "fall"}
-                   {:year "2020" :season "winter"}
-                   {:year "2020" :season "spring"}
-                   {:year "2020" :season "summer"}])
+(def first-season {:year 2019 :season 2})
+(def cur-season (time/cur-season))
+(def latest-season (time/inc-season cur-season))
 
-(def cur-season
-  (r/atom (merge (cks/get :cur-season (last seasons-list))
+(def seasons-list
+  (mapv time/season->str
+        (time/season-range first-season latest-season)))
+
+(def selected-season
+  (r/atom (merge (cks/get :selected-season (last seasons-list))
                  url-hash)))
 
 (def username (->> ""
@@ -159,7 +163,7 @@
     (reset! profile data)))
 
 (defn get-shows! []
-  (let [{year :year season :season} @cur-season
+  (let [{year :year season :season} @selected-season
         user (some-> js/document
                  (.getElementById "anilist-input")
                  (.-value)
@@ -168,14 +172,14 @@
                            (str year) season user])]
     (when (:remember-preference @settings-ui)
       (set-cookie! :settings @settings-ui)
-      (set-cookie! :cur-season @cur-season)
+      (set-cookie! :selected-season @selected-season)
       (set-cookie! :username user))
     (reset! profile :loading)
     (reset! show-items init-items)
     (GET url {:handler reset-state})
     (set! js/window.location.href
-          (str "#year=" (@cur-season :year)
-               "&season=" (@cur-season :season)
+          (str "#year=" (@selected-season :year)
+               "&season=" (@selected-season :season)
                "&username=" (js/encodeURIComponent @username)))))
 
 (defn r-map
@@ -191,14 +195,14 @@
 (defn show-season-button [{:keys [year season] :as entry}]
   [:a
    {:on-click (fn [_]
-                (reset! cur-season entry)
+                (reset! selected-season entry)
                 (get-shows!))
     :href (str "/#year=" year
                "&season=" season
                "&username=" @username)
     :class (str "button season-button"
-                (if (and (= (@cur-season :year) (str year))
-                         (= (@cur-season :season) season))
+                (if (and (= (@selected-season :year) (str year))
+                         (= (@selected-season :season) season))
                   " selected-season" ""))}
    (str(str/upper-case season) " " year)])
 
@@ -479,7 +483,7 @@
                                  (:per-show-count stat-counts)))
        "%"
        [:br]
-       (if false;^boolean goog.DEBUG
+       (if ^boolean goog.DEBUG
          (let [{w :sum c :count} (:weight show)]
            [:div.debug-info
             [:p "weight:" w [:br]
@@ -547,8 +551,8 @@
       \" @username \"]
      [:p
       [:a.button
-       {:href (str "/#year=" (@cur-season :year)
-                   "&season=" (@cur-season :season)
+       {:href (str "/#year=" (@selected-season :year)
+                   "&season=" (@selected-season :season)
                    "&username=")
         :on-click #(update-shows!)}
        "Back to default view"]
