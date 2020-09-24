@@ -80,7 +80,6 @@
       (if has-next
         (recur (inc page) results)
         results))))
-(def a "asdf")
 
 (defn format-season-show
   [show]
@@ -144,7 +143,7 @@
               :MediaSeason.season (str/upper-case season)}]
     (map format-season-show (get-all-pages q vars))))
 
-(defn get-popular
+(defn get-popular ; by making a nerdy website
   "return the top most popular shows"
   []
   (let [q "media(sort: POPULARITY_DESC
@@ -165,26 +164,10 @@
           }"
         results (->> (range 1 21)
                      (map (partial get-page q {} 50))
-                     (mapcat #(get-in % ["Page" "media"])))
-        scores (map #(get % "averageScore") results)
-        mean (/ (reduce + scores) (count scores))
-        deviation (Math/sqrt
-                    (/ (reduce +
-                               (map (comp
-                                      #(* % %)
-                                      #(- % mean)) scores))
-                       (dec (count scores))))]
+                     (mapcat #(get-in % ["Page" "media"])))]
     (map (fn [show]
-           (assoc show :score
-                  (/ (- (show "averageScore") mean)
-                     deviation)))
+           (assoc show :score (show "averageScore")))
          results)))
-
-(defn stddev-score
-  "compute a score's standard deviation."
-  [stats score]
-  (/ (- score (stats "meanScore"))
-     (stats "standardDeviation")))
 
 (defn make-user-query
   "Make call to Anilist API to fetch user data."
@@ -249,13 +232,11 @@
                                     (comp
                                       (mapcat #(% "entries"))
                                       (map #(get-in % ["media" "id"]))))
-                                  media-lists)
-        stats (get-in data ["User" "statistics" "anime"])]
+                                  media-lists)]
     (if (:error data)
       data
       {:shows shows
        :favorites (get-in data ["User" "favourites"])
-       :stats stats
        :id-by-status id-by-status})))
 
 (defn show-to-staff [show]
@@ -404,6 +385,13 @@
     (mapv (comp reformat-output add-relations add-status)
           (link-season-to-shows season
                                 (map add-status (:shows user-data))))))
+
+(defn synthesize-popular [season popular]
+  (let [add-status (partial attach-status {})
+        add-relations (partial process-relations {})]
+    (mapv (comp reformat-output add-relations add-status)
+          (link-season-to-shows season
+                                (map add-status popular)))))
 
 (defn load-results
   ([year season] (link-season-to-shows

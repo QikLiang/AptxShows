@@ -137,7 +137,8 @@
         (time/season-range first-season latest-season)))
 
 (def selected-season
-  (r/atom (merge (cks/get :selected-season (last seasons-list))
+  (r/atom (merge (cks/get :selected-season
+                          (time/season->str cur-season))
                  url-hash)))
 
 (def username (->> ""
@@ -307,7 +308,9 @@
      "MyAnimeList: Support work in progress.\u00A0"
      [:a {:href "https://anilist.co/forum/thread/3393"}
       " In the meantime, it's possible to export data
-       to an Anilist account."]]]
+       to an Anilist account."]]
+    [:p "When no user given, top 1000 most popular shows "
+     "from Anilist is used as reference."]]
    [:hr]
    [:div#settings-sliders
     (r-map first expandable-slider (:preference descriptions))]
