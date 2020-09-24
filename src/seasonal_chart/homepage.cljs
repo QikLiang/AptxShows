@@ -14,7 +14,7 @@
 
 (defn set-cookie! [k v] (cks/set! k v {:domain nil}))
 
-(def settings-version 1)
+(def settings-version 2)
 (when (> settings-version (cks/get :version 0))
   (set-cookie! :version settings-version)
   (cks/remove! :settings))
