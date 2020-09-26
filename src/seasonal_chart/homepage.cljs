@@ -465,11 +465,14 @@
     [:div.info-column
      [:div.show-title (get-in show ["title" "romaji"])]
      [:div.show-info-wrapper
-      [:div.video-wrapper
-       (if (= "youtube" (get-in show ["trailer" "site"]))
+      (if (= "youtube" (get-in show ["trailer" "site"]))
+        [:div.video-wrapper
          [:iframe {:src (str "https://www.youtube-nocookie.com/embed/"
                              (get-in show ["trailer" "id"]))
-                   :allowFullScreen "allowFullScreen"}])]
+                   :allowFullScreen "allowFullScreen"}]]
+        ; leave empty div for justify-content: space-between
+        ; to push show-info to the right
+        [:div])
       [:div.show-info
        [:a {:href (str "https://anilist.co/anime/" (show "id"))}
         "Anilist entry"]
@@ -486,7 +489,7 @@
                                  (:per-show-count stat-counts)))
        "%"
        [:br]
-       (if ^boolean goog.DEBUG
+       (if false;^boolean goog.DEBUG
          (let [{w :sum c :count} (:weight show)]
            [:div.debug-info
             [:p "weight:" w [:br]
@@ -582,8 +585,7 @@
                                        true)
                  (filter (partial filter-show (:filters @settings)))
                  (take @show-items)
-                 (r-map #(% "id")
-                        (partial display-show stat-counts)))))))
+                 (map (partial display-show stat-counts)))))))
 
 (r/render [show-header]
           (.getElementById js/document "header"))

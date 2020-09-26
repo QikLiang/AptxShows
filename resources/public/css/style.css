@@ -256,7 +256,6 @@ input[type="checkbox"] {
 	flex-direction: column;
 	font-size: 1.5em;
 	margin-left: 10px;
-	width: 65vw;
 	flex-grow: 1;
 }
 
@@ -264,6 +263,7 @@ input[type="checkbox"] {
 	display: flex;
 	flex-direction: row;
 	width: 100%;
+	--content-height: 30vw;
 }
 
 .show-info-wrapper {
@@ -271,6 +271,7 @@ input[type="checkbox"] {
 	flex-direction: row;
 	flex-wrap: wrap;
 	justify-content: space-between;
+	height: 100%;
 }
 
 .show-info {
@@ -281,8 +282,9 @@ input[type="checkbox"] {
 	display: block;
 	border: 2px solid var(--shadow-color);
 	border-radius: 2px;
-	width: 400px;
-	height: auto;
+	width: auto;
+	flex-shrink: 0;
+	height: var(--content-height);
 	align-self: start;
 }
 
@@ -291,7 +293,6 @@ input[type="checkbox"] {
 	background-color: var(--highlight-background);
 	font-size: 1.5em;
 	box-sizing: border-box;
-	width: 100%;
 	padding: 10px;
 	border-radius: 5px;
 	margin-bottom: 10px;
@@ -300,8 +301,15 @@ input[type="checkbox"] {
 
 .video-wrapper {
   position: relative;
-  width: 30vw;
-  height: 17vw;
+  max-width: calc((var(--content-height) - 78px) * 16 / 9);
+  display: inline-block;
+  flex-grow: 1;
+  min-width: 30vw;
+}
+.video-wrapper:after{
+  padding-top: 56.25%;
+  display: block;
+  content: '';
 }
 .video-wrapper iframe {
   position: absolute;
