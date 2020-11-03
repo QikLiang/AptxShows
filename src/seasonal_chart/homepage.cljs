@@ -254,10 +254,9 @@
     [:svg.expand-button
      {:width 30 :height 30}
      [:line {:x1 5 :y1 15 :x2 25 :y2 15}]
-     (if (not expanded) [:line {:x1 15 :y1 5 :x2 15 :y2 25}])]
+     (when (not expanded) [:line {:x1 15 :y1 5 :x2 15 :y2 25}])]
     header]
-   (if expanded
-     [:div.expandable-content content])]))
+   (when expanded [:div.expandable-content content])]))
 
 (defn expandable-slider [[root-param sub-params]]
   [expandable-container [setting-slider [:preference root-param]]
@@ -489,7 +488,7 @@
                                  (:per-show-count stat-counts)))
        "%"
        [:br]
-       (if false;^boolean goog.DEBUG
+       (when false;^boolean goog.DEBUG
          (let [{w :sum c :count} (:weight show)]
            [:div.debug-info
             [:p "weight:" w [:br]
@@ -550,9 +549,9 @@
     [:div.show-item.error-message
      [:h1 "Username not found."]
      [:hr]
-     [:p "This website gives recommendations based on what it"
+     [:p "This website gives recommendations based on what it "
       "can understand from your "
-      [:a {:href "anilist.co"} "Anilist"]
+      [:a {:href "https://anilist.co"} "Anilist"]
       " profile. However, there is no Anilist user named "
       \" @username \"]
      [:p
