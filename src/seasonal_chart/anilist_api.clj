@@ -205,13 +205,22 @@
           }"
         vars {:String.user user}
         results (query q vars)]
-    (if (:error results)
-      (if (= "User not found"
-             (get-in results [:error :response "errors"
-                           0 "message"]))
-        {:error :user-not-found}
-        (:error results))
-      results)))
+    (println (update results :error
+            #(-> %
+                 (get-in [:response "errors" 0 "message"])
+                 (case
+                   "User not found" :user-not-found
+                   "Private User" :private-user
+                   nil nil
+                   :unhandled-error))))
+    (update results :error
+            #(-> %
+                 (get-in [:response "errors" 0 "message"])
+                 (case
+                   "User not found" :user-not-found
+                   "Private User" :private-user
+                   nil nil
+                   :unhandled-error)))))
 
 (defn get-user-data
   "Fetch all user data needed to personalize results."

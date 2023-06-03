@@ -536,40 +536,60 @@
    [:polyline {:points "7,15 25,30 42,15"}]
    [:line {:x1 7 :y1 35 :x2 42 :y2 35}] ])
 
+(defn show-error [season title & message]
+  (let [back-button [:a.button
+                     {:href (str "/#year=" (season :year)
+                                 "&season=" (season :season)
+                                 "&username=")
+                      :on-click #(update-shows!)}
+                     "Back to default view"]
+        footer
+        [:p back-button
+         "The default view makes recommendations based on the "
+         "top 1,000 most popular shows."]]
+    (into [:div.show-item.error-message
+           [:h1.load-message title]]
+          (concat message [footer]))))
+
 (defn show-list []
-  (cond
-    (= @profile :loading)
+  (case @profile
+    :loading
     [:h1.show-item.load-message "Please wait while loading"]
 
-    (= @profile :unhandled-error)
-    [:h1.show-item.load-message "Something went wrong.
-                                 Please wait for it to be fixed."]
+    :unhandled-error
+    (show-error @selected-season
+      "Something went wrong."
+      [:p
+       "Contact me on "
+       [:a {:href "https://www.reddit.com/user/SingularCheese"}
+        "reddit"]
+       ", "
+       [:a {:href "https://github.com/QikLiang/AptxShows/issues"}
+        "Github"]
+       ", or wait for it to be fixed (no promises)."])
 
-    (= @profile :user-not-found)
-    [:div.show-item.error-message
-     [:h1 "Username not found."]
-     [:hr]
-     [:p "This website gives recommendations based on what it "
-      "can understand from your "
-      [:a {:href "https://anilist.co"} "Anilist"]
-      " profile. However, there is no Anilist user named "
-      \" @username \"]
-     [:p
-      [:a.button
-       {:href (str "/#year=" (@selected-season :year)
-                   "&season=" (@selected-season :season)
-                   "&username=")
-        :on-click #(update-shows!)}
-       "Back to default view"]
-      "The default view makes recommendations based on the "
-      "top 1,000 most popular shows."]
-     [:h3 "For MyAnimeList users"]
-     [:p "It is possible to create an Anilist profile and "
-      "export the shows you've seen from MAL. "
-      [:a {:href "https://anilist.co/forum/thread/3393"}
-       "See here for instructions."]]]
+    :user-not-found
+    (show-error @selected-season
+      "Username not found."
+      [:p "This website gives recommendations based on what it "
+       "can understand from your "
+       [:a {:href "https://anilist.co"} "Anilist"]
+       " profile. However, there is no Anilist user named "
+       \" @username \"]
+      [:h3 "For MyAnimeList users"]
+      [:p "It is possible to create an Anilist profile and "
+       "export the shows you've seen from MAL. "
+       [:a {:href "https://anilist.co/forum/thread/3393"}
+        "See here for instructions."]])
 
-    :else
+    :private-user
+    (show-error @selected-season
+      "User is private"
+      [:p "Can't access profile for "
+       [:a {:href (str "https://anilist.co/user/" @username)}
+        @username]
+       \.])
+
     (let [preference (->> @settings
                           :preference
                           vals
